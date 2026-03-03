@@ -1,0 +1,174 @@
+---
+title: Instagram Downloader
+description: Automatically download Instagram reels and posts by sending the URL
+---
+
+Download Instagram reels and posts directly in WhatsApp. Simply send an Instagram link and the bot will automatically process and send you the video.
+
+## How it works
+
+The bot automatically detects Instagram URLs in your messages and downloads the content without requiring any special commands.
+
+<Note>
+This feature is **automatic** - no command needed! Just send an Instagram link.
+</Note>
+
+## Supported formats
+
+The bot can download from these Instagram URL formats:
+
+- **Reels**: `https://www.instagram.com/reel/[id]` or `https://www.instagram.com/reels/[id]`
+- **Posts**: `https://www.instagram.com/p/[id]`
+
+## Usage
+
+<Steps>
+  <Step title="Find Instagram content">
+    Open Instagram and find a reel or post you want to download
+  </Step>
+  
+  <Step title="Copy the link">
+    Tap the share button and copy the link to clipboard
+  </Step>
+  
+  <Step title="Send to bot">
+    Paste the Instagram URL in your WhatsApp chat with the bot
+    ```
+    https://www.instagram.com/reel/ABC123xyz/
+    ```
+  </Step>
+  
+  <Step title="Wait for download">
+    The bot will process the video and send it back to you
+    ```
+    ⏳ Processing Instagram video... please wait.
+    ```
+  </Step>
+  
+  <Step title="Receive video">
+    Once processed, you'll receive the video file
+    ```
+    ✅ Here is your Instagram video!
+    ```
+  </Step>
+</Steps>
+
+## Implementation details
+
+From `messageHandler.ts:32-61`, the bot uses a regex pattern to detect Instagram links:
+
+```typescript
+const instaRegex = /https?:\/\/(www\.)?instagram\.com\/(reels?|p)\/([a-zA-Z0-9_-]+)/;
+const instaMatch = text.match(instaRegex);
+
+if (instaMatch) {
+    const url = instaMatch[0];
+    await sock.sendMessage(remoteJid, { 
+        text: '⏳ Processing Instagram video... please wait.' 
+    });
+    
+    const videoPath = await InstagramService.downloadReel(url);
+    const videoBuffer = fs.readFileSync(videoPath);
+
+    await sock.sendMessage(remoteJid, { 
+        video: videoBuffer,
+        caption: '✅ Here is your Instagram video!',
+        mimetype: 'video/mp4'
+    });
+}
+```
+
+The `InstagramService` uses `yt-dlp` to download videos in the best available quality (preferring MP4 format).
+
+## Requirements
+
+<Warning>
+The Instagram download feature requires `yt-dlp` to be installed in the `bin/` directory. See the [installation guide](/installation) for setup instructions.
+</Warning>
+
+From `InstagramService.ts:10-31`:
+```typescript
+private static binPath = path.join(process.cwd(), 'bin', 'yt-dlp');
+
+static async downloadReel(url: string): Promise<string> {
+    const command = `"${this.binPath}" -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" 
+                     --no-playlist --user-agent "${userAgent}" -o "${outputPath}" "${url}"`;
+    await execAsync(command);
+    return outputPath;
+}
+```
+
+## Error handling
+
+If the download fails, you'll receive an error message:
+
+```
+❌ Failed to process Instagram video. The link might be private or invalid.
+```
+
+**Common reasons for failure:**
+- The post is from a private account
+- The URL is invalid or expired
+- The content has been deleted
+- Network connectivity issues
+- `yt-dlp` is not properly installed
+
+## Privacy considerations
+
+<Info>
+Downloaded videos are temporarily stored during processing and automatically deleted after being sent to you. The bot does not permanently store Instagram content.
+</Info>
+
+From `messageHandler.ts:52-55`:
+```typescript
+// Cleanup
+if (fs.existsSync(videoPath)) {
+    fs.unlinkSync(videoPath);
+}
+```
+
+## Advanced configuration
+
+### Cookie authentication
+
+For accessing content from accounts you follow (useful for private accounts), you can provide Instagram cookies:
+
+1. Create a `cookie.txt` file in the project root
+2. Export your Instagram cookies using a browser extension
+3. Place the cookies in the file
+
+From `InstagramService.ts:21-36`:
+```typescript
+const cookiePath = path.join(process.cwd(), 'cookie.txt');
+
+if (fs.existsSync(cookiePath)) {
+    command += ` --cookies "${cookiePath}"`;
+}
+```
+
+<Warning>
+Never share your `cookie.txt` file as it contains your Instagram session credentials.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Video download is very slow">
+    Instagram throttles download speeds. Large videos may take 30-60 seconds to process. The bot will send a processing message while it works.
+  </Accordion>
+  
+  <Accordion title="Getting 'Failed to process' error">
+    - Check that `yt-dlp` is installed in `bin/yt-dlp`
+    - Verify the Instagram URL is valid and public
+    - Try updating `yt-dlp` to the latest version
+  </Accordion>
+  
+  <Accordion title="Private account content not downloading">
+    You need to provide Instagram cookies in `cookie.txt` to download content from accounts you follow. See the Advanced Configuration section above.
+  </Accordion>
+</AccordionGroup>
+
+## Related features
+
+- [!sticker](/commands/sticker) - Convert downloaded videos to WhatsApp stickers
+- [Spotify Controls](/commands/spotify) - Another integration feature

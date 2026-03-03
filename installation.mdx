@@ -123,6 +123,10 @@ Install all required packages:
 npm install
 ```
 
+<Note>
+The repository includes `yt-dlp` in the `bin/` directory for Instagram video downloads. This binary is pre-installed and requires no additional setup.
+</Note>
+
 This installs the following key dependencies:
 
 <AccordionGroup>
@@ -175,9 +179,8 @@ This installs the following key dependencies:
     # PostgreSQL connection string
     DATABASE_URL=postgres://user:password@host:port/database
 
-    # Server ports
+    # Server port
     PORT=3000
-    SPOTIFY_PORT=8888
 
     # Optional: Spotify OAuth credentials (for music control)
     SPOTIFY_CLIENT_ID=your_client_id_here
@@ -194,9 +197,12 @@ This installs the following key dependencies:
     |----------|----------|-------------|----------|
     | `DATABASE_URL` | Yes | PostgreSQL connection string with SSL | `postgres://user:pass@host:5432/db` |
     | `PORT` | No | Main Express server port | `3000` (default) |
-    | `SPOTIFY_PORT` | No | Spotify OAuth callback port | `8888` (default) |
     | `SPOTIFY_CLIENT_ID` | No | Spotify OAuth client ID | From Spotify Developer Dashboard |
     | `SPOTIFY_CLIENT_SECRET` | No | Spotify OAuth client secret | From Spotify Developer Dashboard |
+    
+    <Note>
+    The Spotify OAuth callback server runs on port **8888** (hardcoded in `src/index.ts:39`). This port is not configurable via environment variables.
+    </Note>
 
     <Tip>
     Spotify credentials are optional. The bot works without them, but you won't be able to use music control features.

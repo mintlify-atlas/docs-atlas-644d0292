@@ -37,7 +37,8 @@
           "commands/note",
           "commands/sticker",
           "commands/timer",
-          "commands/spotify"
+          "commands/spotify",
+          "commands/instagram"
         ]
       },
       {
