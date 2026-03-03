@@ -1,0 +1,68 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "WhatsApp Assistant Bot",
+  "projectDescription": "A personal WhatsApp bot for managing reminders, tasks, notes, and utilities through chat commands.",
+  "theme": "palm",
+  "primaryColor": "#25D366",
+  "lightColor": "#34E877",
+  "darkColor": "#1DA851",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "quickstart",
+          "installation"
+        ]
+      },
+      {
+        "group": "Commands",
+        "pages": [
+          "commands/overview",
+          "commands/notify",
+          "commands/todo",
+          "commands/note",
+          "commands/sticker",
+          "commands/timer",
+          "commands/spotify"
+        ]
+      },
+      {
+        "group": "Configuration",
+        "pages": [
+          "configuration/database",
+          "configuration/environment",
+          "configuration/deployment"
+        ]
+      },
+      {
+        "group": "Development",
+        "pages": [
+          "development/architecture",
+          "development/adding-commands",
+          "development/services"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Personal reminders with flexible time formats",
+    "Persistent todo list management",
+    "Notes storage with search capabilities",
+    "Sticker creation from media files",
+    "Countdown timers",
+    "Spotify playback control",
+    "PostgreSQL database persistence",
+    "DM-only privacy protection"
+  ],
+  "publicApiSurface": [
+    "!notify <task> <time>",
+    "!todo add/list/done/delete/clear",
+    "!note save/list/view/delete/search",
+    "!sticker [f/full]",
+    "!timer start/list/cancel",
+    "!spotify or /play, /pause, /skip",
+    "!help [command]"
+  ]
+}
