@@ -1,0 +1,463 @@
+---
+title: Adding New Commands
+description: Step-by-step guide to creating custom command handlers for the WhatsApp Assistant Bot
+---
+
+## Overview
+
+Adding a new command to the WhatsApp Assistant Bot involves three main steps:
+
+1. Create a command handler that implements the `CommandHandler` interface
+2. Register the command in the command registry
+3. (Optional) Create a service if the command requires database operations
+
+This guide will walk you through the process with real examples from the codebase.
+
+## Command Handler Interface
+
+All commands must implement the `CommandHandler` interface defined in `src/types/commands.ts`:
+
+```typescript
+export interface CommandHandler {
+    name: string;              // Command name (e.g., "todo")
+    description: string;       // Short description for help text
+    usage: string;            // Usage syntax
+    examples: string[];       // Example commands
+    execute: (context: CommandContext) => Promise<void>;
+}
+
+export interface CommandContext {
+    socket: WASocket;         // WhatsApp connection
+    message: proto.IWebMessageInfo; // Original message object
+    chat: string;            // Chat ID (group or DM)
+    sender: string;          // User ID who sent the message
+    args: string[];          // Command arguments (split by spaces)
+    commandName?: string;    // The command name used
+}
+```
+
+## Creating a Command Handler
+
+<Steps>
+
+### Step 1: Create the Handler File
+
+Create a new file in `src/handlers/commands/` with the pattern `[Name]Handler.ts`.
+
+For example, let's create a simple greeting command:
+
+```typescript
+// src/handlers/commands/GreetHandler.ts
+import { CommandHandler, CommandContext } from '../../types/commands.js';
+
+export const GreetHandler: CommandHandler = {
+    name: 'greet',
+    description: 'Send a personalized greeting',
+    usage: '!greet [name]',
+    examples: [
+        '!greet',
+        '!greet John',
+        '!greet Alice'
+    ],
+    execute: async (context: CommandContext) => {
+        const { socket, chat, sender, args } = context;
+
+        const name = args.length > 0 ? args.join(' ') : 'there';
+        const greeting = `👋 Hello, ${name}! How can I help you today?`;
+
+        await socket.sendMessage(chat, { text: greeting });
+    }
+};
+```
+
+### Step 2: Register the Command
+
+Add your handler to the command registry in `src/handlers/commands/index.ts`:
+
+```typescript
+import { GreetHandler } from './GreetHandler.js';
+
+// Add to exports
+export { GreetHandler } from './GreetHandler.js';
+
+// Add to the commandHandlers Map
+export const commandHandlers: Map<string, CommandHandler> = new Map([
+    ['notify', NotifyHandler],
+    ['todo', TodoHandler],
+    ['note', NoteHandler],
+    ['timer', TimerHandler],
+    ['help', HelpHandler],
+    ['sticker', StickerHandler],
+    ['spotify', SpotifyHandler],
+    ['greet', GreetHandler], // Add your command here
+]);
+```
+
+### Step 3: Test Your Command
+
+Restart the bot and send `!greet` or `!greet YourName` in WhatsApp.
+
+</Steps>
+
+## Real-World Examples
+
+### Example 1: Simple Command (Note Handler)
+
+The Note handler demonstrates subcommands and basic service integration:
+
+```typescript
+// src/handlers/commands/NoteHandler.ts
+import { CommandHandler, CommandContext } from '../../types/commands.js';
+import { NoteService } from '../../services/NoteService.js';
+
+export const NoteHandler: CommandHandler = {
+    name: 'note',
+    description: 'Manage your notes',
+    usage: '!note <save/list/view/delete/search> [content/number/query]',
+    examples: [
+        '!note save Remember to buy milk',
+        '!note list',
+        '!note view 1',
+        '!note delete 2',
+        '!note search milk'
+    ],
+    execute: async (context: CommandContext) => {
+        const { socket, chat, sender, args } = context;
+
+        // Validate arguments
+        if (args.length === 0) {
+            await socket.sendMessage(chat, { text: 'Usage: ' + NoteHandler.usage });
+            return;
+        }
+
+        const subCommand = args[0].toLowerCase();
+
+        try {
+            switch (subCommand) {
+                case 'save':
+                    if (args.length < 2) {
+                        await socket.sendMessage(chat, { 
+                            text: 'Please specify the note content.' 
+                        });
+                        return;
+                    }
+                    const content = args.slice(1).join(' ');
+                    await NoteService.create(sender, content);
+                    await socket.sendMessage(chat, { 
+                        text: '📝 Note saved successfully!' 
+                    });
+                    break;
+
+                case 'list':
+                    const notes = await NoteService.list(sender);
+                    if (notes.length === 0) {
+                        await socket.sendMessage(chat, { text: 'No notes found.' });
+                        return;
+                    }
+
+                    const noteList = notes.map((note, index) => {
+                        const preview = note.content.length > 50
+                            ? note.content.substring(0, 47) + '...'
+                            : note.content;
+                        return `${index + 1}. ${preview}`;
+                    }).join('\n');
+
+                    await socket.sendMessage(chat, {
+                        text: '📚 Your Notes:\n' + noteList
+                    });
+                    break;
+
+                // ... other cases
+            }
+        } catch (error) {
+            console.error('Error in note command:', error);
+            await socket.sendMessage(chat, {
+                text: '❌ Failed to process note command. Please try again.'
+            });
+        }
+    }
+};
+```
+
+**Key Patterns:**
+- Argument validation
+- Subcommand routing with switch statement
+- Service layer for database operations
+- Error handling with user feedback
+- Formatting output for readability
+
+### Example 2: Complex Command (Todo Handler)
+
+The Todo handler shows more advanced patterns:
+
+```typescript
+// src/handlers/commands/TodoHandler.ts (excerpt)
+case 'add':
+    if (args.length < 2) {
+        await socket.sendMessage(chat, { 
+            text: 'Please specify a task to add.' 
+        });
+        return;
+    }
+    
+    const taskInput = args.slice(1).join(' ');
+    
+    // Support multiple tasks separated by commas
+    const tasks = taskInput
+        .split(',')
+        .map(task => task.trim())
+        .filter(task => task.length > 0);
+
+    if (tasks.length === 0) {
+        await socket.sendMessage(chat, { 
+            text: 'Please specify valid tasks to add.' 
+        });
+        return;
+    }
+
+    // Add each task in parallel
+    const addedTasks = await Promise.all(
+        tasks.map(task => TodoService.create(sender, chat, task))
+    );
+
+    // Format response based on number of tasks
+    const responseMsg = tasks.length === 1
+        ? '✅ Todo added: ' + tasks[0]
+        : '✅ Added multiple todos:\n' + 
+          tasks.map((task, i) => `${i + 1}. ${task}`).join('\n');
+
+    await socket.sendMessage(chat, { text: responseMsg });
+    break;
+```
+
+**Advanced Patterns:**
+- Batch operations (comma-separated input)
+- Parallel database operations with `Promise.all`
+- Conditional response formatting
+- Input sanitization and validation
+
+### Example 3: Parsing and Validation (Notify Handler)
+
+The Notify handler demonstrates custom parsing logic:
+
+```typescript
+// src/handlers/commands/NotifyHandler.ts (excerpt)
+execute: async (context: CommandContext) => {
+    const { socket, chat, sender, args } = context;
+
+    if (args.length < 2) {
+        await socket.sendMessage(chat, {
+            text: 'Usage: !notify <task> <time>'
+        });
+        return;
+    }
+
+    try {
+        // Task is everything except the last argument
+        const task = args.slice(0, -1).join(' ');
+        const timeStr = args[args.length - 1];
+
+        // Parse time string (e.g., '30m', '1h', '2h30m')
+        const duration = parseTimeString(timeStr);
+        if (!duration) {
+            await socket.sendMessage(chat, {
+                text: 'Invalid time format. Examples: 30m, 1h, 2h30m'
+            });
+            return;
+        }
+
+        const reminderTime = moment().add(duration, 'minutes').toDate();
+        
+        await ReminderService.create(sender, task, reminderTime);
+
+        const confirmMessage = 
+            `✅ Reminder set: "${task}" in ${formatDuration(duration)}`;
+        await socket.sendMessage(chat, { text: confirmMessage });
+
+    } catch (error) {
+        console.error('Error in notify command:', error);
+        await socket.sendMessage(chat, {
+            text: '❌ Failed to set reminder. Please try again.'
+        });
+    }
+}
+
+// Helper function for parsing time
+function parseTimeString(timeStr: string): number | null {
+    const hourMatch = timeStr.match(/(\d+)h/);
+    const minuteMatch = timeStr.match(/(\d+)m/);
+
+    let totalMinutes = 0;
+
+    if (hourMatch) {
+        totalMinutes += parseInt(hourMatch[1]) * 60;
+    }
+    if (minuteMatch) {
+        totalMinutes += parseInt(minuteMatch[1]);
+    }
+
+    return totalMinutes > 0 ? totalMinutes : null;
+}
+```
+
+**Key Techniques:**
+- Custom argument parsing (last arg as time)
+- Regular expression pattern matching
+- Helper functions for complex logic
+- Date/time manipulation with moment.js
+
+## Best Practices
+
+### 1. Input Validation
+
+Always validate user input before processing:
+
+```typescript
+if (args.length === 0) {
+    await socket.sendMessage(chat, { text: 'Usage: ' + YourHandler.usage });
+    return;
+}
+
+if (args.length < 2 || isNaN(parseInt(args[1]))) {
+    await socket.sendMessage(chat, { 
+        text: 'Please specify a valid number.' 
+    });
+    return;
+}
+```
+
+### 2. Error Handling
+
+Wrap command logic in try-catch blocks:
+
+```typescript
+try {
+    // Command logic here
+} catch (error) {
+    console.error(`Error in ${YourHandler.name} command:`, error);
+    await socket.sendMessage(chat, {
+        text: '❌ Failed to process command. Please try again.'
+    });
+}
+```
+
+### 3. User Feedback
+
+Provide clear, helpful feedback:
+
+```typescript
+// Good: Specific error message
+await socket.sendMessage(chat, { 
+    text: 'Invalid todo number. Use !todo list to see available todos.' 
+});
+
+// Bad: Generic error
+await socket.sendMessage(chat, { text: 'Error' });
+```
+
+### 4. Use Services for Business Logic
+
+Keep handlers focused on user interaction:
+
+```typescript
+// Good: Handler delegates to service
+const todos = await TodoService.list(chat);
+
+// Bad: Handler contains database logic
+const todos = await db.select().from(todos).where(eq(todos.chatId, chat));
+```
+
+### 5. Support Multiple Aliases
+
+Register multiple names for the same handler:
+
+```typescript
+export const commandHandlers: Map<string, CommandHandler> = new Map([
+    ['spotify', SpotifyHandler],
+    ['play', SpotifyHandler],    // Alias
+    ['pause', SpotifyHandler],   // Alias
+    ['skip', SpotifyHandler],    // Alias
+]);
+```
+
+## Common Patterns
+
+### Subcommand Router
+
+```typescript
+const subCommand = args[0].toLowerCase();
+
+switch (subCommand) {
+    case 'add':
+        // Add logic
+        break;
+    case 'list':
+        // List logic
+        break;
+    case 'delete':
+        // Delete logic
+        break;
+    default:
+        await socket.sendMessage(chat, {
+            text: 'Unknown subcommand. Use: add, list, or delete.'
+        });
+}
+```
+
+### Index-Based Selection
+
+```typescript
+const items = await SomeService.list(sender);
+const index = parseInt(args[1]) - 1; // User provides 1-based index
+
+if (index < 0 || index >= items.length) {
+    await socket.sendMessage(chat, { text: 'Invalid number.' });
+    return;
+}
+
+const selectedItem = items[index];
+// Process selected item
+```
+
+### Formatting Lists
+
+```typescript
+const formattedList = items.map((item, index) => 
+    `${index + 1}. ${item.completed ? '✓' : '○'} ${item.text}`
+).join('\n');
+
+await socket.sendMessage(chat, {
+    text: '📝 Your List:\n' + formattedList
+});
+```
+
+## Testing Your Command
+
+<Steps>
+
+### Build the Project
+
+```bash
+npm run build
+```
+
+### Start the Bot
+
+```bash
+npm start
+```
+
+### Test in WhatsApp
+
+1. Send `!help` to verify your command appears
+2. Send `!yourcommand` with various inputs
+3. Test error cases (missing args, invalid input)
+4. Verify database changes if applicable
+
+</Steps>
+
+## Next Steps
+
+- Learn about the [Service Layer](/development/services) for database operations
+- Review the [System Architecture](/development/architecture) for overall design
+- Check existing handlers in `src/handlers/commands/` for more examples

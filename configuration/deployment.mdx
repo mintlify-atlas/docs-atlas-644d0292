@@ -1,0 +1,646 @@
+---
+title: Deployment
+description: Deploy WhatsApp Assistant Bot to VPS, cloud platforms, or containers
+---
+
+The WhatsApp Assistant Bot can be deployed in various environments. This guide covers deployment options and best practices.
+
+## Prerequisites
+
+Before deploying, ensure you have:
+
+- Node.js 18+ installed
+- PostgreSQL database (local or managed service)
+- Environment variables configured
+- WhatsApp account for bot authentication
+
+## Build Process
+
+The bot requires a build step before deployment:
+
+```bash
+# Install dependencies
+npm install
+
+# Build TypeScript to JavaScript
+npm run build
+
+# Start production server
+npm start
+```
+
+**Build Configuration** (from `package.json`):
+```json
+{
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts"
+  },
+  "type": "module",
+  "main": "dist/index.js"
+}
+```
+
+<Info>
+  The project uses ES Modules (`"type": "module"`). Ensure your Node.js version supports ESM.
+</Info>
+
+## VPS Deployment
+
+Deploy to a Virtual Private Server (DigitalOcean, Linode, Vultr, etc.).
+
+<Steps>
+  <Step title="Prepare Server">
+    SSH into your VPS and install Node.js:
+    
+    ```bash
+    # Ubuntu/Debian
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+    
+    # Verify installation
+    node --version
+    npm --version
+    ```
+  </Step>
+
+  <Step title="Clone Repository">
+    Clone your bot repository:
+    
+    ```bash
+    git clone https://github.com/yourusername/whatsapp-bot.git
+    cd whatsapp-bot
+    ```
+  </Step>
+
+  <Step title="Configure Environment">
+    Create `.env` file with your configuration:
+    
+    ```bash
+    nano .env
+    ```
+    
+    Add your environment variables:
+    ```bash
+    DATABASE_URL="postgresql://user:pass@host:5432/db?sslmode=require"
+    PORT=3000
+    SPOTIFY_CLIENT_ID="your_client_id"
+    SPOTIFY_CLIENT_SECRET="your_secret"
+    SPOTIFY_REDIRECT_URI="https://yourdomain.com:8888/callback"
+    ```
+  </Step>
+
+  <Step title="Install and Build">
+    Install dependencies and build:
+    
+    ```bash
+    npm install
+    npm run build
+    ```
+  </Step>
+
+  <Step title="Run Migrations">
+    Apply database migrations:
+    
+    ```bash
+    npx drizzle-kit generate
+    npx drizzle-kit push
+    ```
+  </Step>
+
+  <Step title="Start Bot">
+    Start the bot for the first time:
+    
+    ```bash
+    npm start
+    ```
+    
+    Scan the QR code with WhatsApp to authenticate.
+  </Step>
+</Steps>
+
+<Warning>
+  After scanning the QR code, authentication data is stored in the `auth_info` directory. Keep this directory secure and backed up.
+</Warning>
+
+## Process Managers
+
+Use a process manager to keep the bot running and auto-restart on crashes.
+
+### PM2 (Recommended)
+
+PM2 is a production-grade process manager for Node.js applications.
+
+**Installation:**
+```bash
+npm install -g pm2
+```
+
+**Start Bot:**
+```bash
+# Start with PM2
+pm2 start dist/index.js --name whatsapp-bot
+
+# View logs
+pm2 logs whatsapp-bot
+
+# Monitor status
+pm2 status
+
+# Auto-start on system reboot
+pm2 startup
+pm2 save
+```
+
+**PM2 Ecosystem File** (`ecosystem.config.cjs`):
+```javascript
+module.exports = {
+  apps: [{
+    name: 'whatsapp-bot',
+    script: './dist/index.js',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '1G',
+    env: {
+      NODE_ENV: 'production'
+    },
+    error_file: './logs/err.log',
+    out_file: './logs/out.log',
+    time: true
+  }]
+};
+```
+
+**Usage:**
+```bash
+pm2 start ecosystem.config.cjs
+```
+
+<Info>
+  The ecosystem file uses `.cjs` extension because the project uses ES Modules. PM2 requires CommonJS for config files.
+</Info>
+
+### systemd Service
+
+For Linux servers, create a systemd service for automatic startup.
+
+**Create Service File** (`/etc/systemd/system/whatsapp-bot.service`):
+```ini
+[Unit]
+Description=WhatsApp Assistant Bot
+After=network.target
+
+[Service]
+Type=simple
+User=your-user
+WorkingDirectory=/home/your-user/whatsapp-bot
+Environment="NODE_ENV=production"
+Environment="DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require"
+Environment="PORT=3000"
+ExecStart=/usr/bin/node /home/your-user/whatsapp-bot/dist/index.js
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/whatsapp-bot/output.log
+StandardError=append:/var/log/whatsapp-bot/error.log
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Enable and Start:**
+```bash
+# Create log directory
+sudo mkdir -p /var/log/whatsapp-bot
+sudo chown your-user:your-user /var/log/whatsapp-bot
+
+# Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable whatsapp-bot
+sudo systemctl start whatsapp-bot
+
+# Check status
+sudo systemctl status whatsapp-bot
+
+# View logs
+sudo journalctl -u whatsapp-bot -f
+```
+
+## Cloud Platform Deployment
+
+### Railway
+
+Railway provides easy deployment with PostgreSQL included.
+
+<Steps>
+  <Step title="Create New Project">
+    1. Go to [Railway](https://railway.app)
+    2. Click "New Project"
+    3. Select "Deploy from GitHub repo"
+  </Step>
+
+  <Step title="Add PostgreSQL">
+    1. Click "New"
+    2. Select "Database" → "PostgreSQL"
+    3. Copy the `DATABASE_URL` from the connection string
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    In your service settings, add:
+    ```
+    DATABASE_URL=${{Postgres.DATABASE_URL}}
+    PORT=3000
+    SPOTIFY_CLIENT_ID=your_client_id
+    SPOTIFY_CLIENT_SECRET=your_secret
+    SPOTIFY_REDIRECT_URI=https://your-app.railway.app:8888/callback
+    ```
+  </Step>
+
+  <Step title="Deploy">
+    Railway automatically builds and deploys when you push to GitHub.
+  </Step>
+</Steps>
+
+<Warning>
+  Railway's free tier has limitations. For persistent WhatsApp connections, consider upgrading to a paid plan.
+</Warning>
+
+### Heroku
+
+Deploy to Heroku with PostgreSQL add-on.
+
+```bash
+# Login to Heroku
+heroku login
+
+# Create new app
+heroku create whatsapp-bot-app
+
+# Add PostgreSQL
+heroku addons:create heroku-postgresql:mini
+
+# Set environment variables
+heroku config:set SPOTIFY_CLIENT_ID="your_client_id"
+heroku config:set SPOTIFY_CLIENT_SECRET="your_secret"
+heroku config:set SPOTIFY_REDIRECT_URI="https://whatsapp-bot-app.herokuapp.com:8888/callback"
+
+# Deploy
+git push heroku main
+
+# View logs
+heroku logs --tail
+```
+
+**Procfile:**
+```
+web: npm start
+```
+
+### DigitalOcean App Platform
+
+Deploy using DigitalOcean's managed platform.
+
+<Steps>
+  <Step title="Create App">
+    1. Go to DigitalOcean App Platform
+    2. Create new app from GitHub repository
+  </Step>
+
+  <Step title="Add Database">
+    1. Add a PostgreSQL database component
+    2. Reference it in environment variables: `${db.DATABASE_URL}`
+  </Step>
+
+  <Step title="Configure Build">
+    Build Command: `npm run build`
+    Run Command: `npm start`
+  </Step>
+
+  <Step title="Set Environment Variables">
+    Add all required environment variables in the app settings.
+  </Step>
+</Steps>
+
+## Container Deployment
+
+While the repository doesn't include a Dockerfile, you can create one for containerized deployments.
+
+**Example Dockerfile:**
+```dockerfile
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Build TypeScript
+RUN npm run build
+
+# Expose ports
+EXPOSE 3000 8888
+
+# Start application
+CMD ["npm", "start"]
+```
+
+**Build and Run:**
+```bash
+# Build image
+docker build -t whatsapp-bot .
+
+# Run container
+docker run -d \
+  --name whatsapp-bot \
+  -p 3000:3000 \
+  -p 8888:8888 \
+  -e DATABASE_URL="postgresql://..." \
+  -v $(pwd)/auth_info:/app/auth_info \
+  whatsapp-bot
+```
+
+<Note>
+  Mount the `auth_info` directory as a volume to persist WhatsApp authentication between container restarts.
+</Note>
+
+**Docker Compose** (`docker-compose.yml`):
+```yaml
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    ports:
+      - "3000:3000"
+      - "8888:8888"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - PORT=3000
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - SPOTIFY_REDIRECT_URI=${SPOTIFY_REDIRECT_URI}
+    volumes:
+      - ./auth_info:/app/auth_info
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=whatsapp_bot
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=your_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
+```
+
+## Port Configuration
+
+The bot uses two ports:
+
+- **Port 3000** (configurable via `PORT` env var): Main Express server
+- **Port 8888** (hardcoded): Spotify OAuth callback server
+
+<Warning>
+  Ensure both ports are accessible if using Spotify integration. Port 8888 is hardcoded in `src/index.ts:39` and cannot be changed via environment variables.
+</Warning>
+
+**Firewall Configuration:**
+```bash
+# Ubuntu/Debian with ufw
+sudo ufw allow 3000/tcp
+sudo ufw allow 8888/tcp
+```
+
+## WhatsApp Authentication
+
+On first run, the bot generates a QR code for WhatsApp authentication.
+
+### Initial Setup
+
+<Steps>
+  <Step title="Start the Bot">
+    ```bash
+    npm start
+    ```
+  </Step>
+
+  <Step title="Scan QR Code">
+    A QR code will appear in the terminal:
+    ```
+    📱 Scan this QR code with WhatsApp to connect:
+    ```
+  </Step>
+
+  <Step title="Authenticate">
+    1. Open WhatsApp on your phone
+    2. Go to Settings → Linked Devices
+    3. Tap "Link a Device"
+    4. Scan the QR code
+  </Step>
+
+  <Step title="Wait for Connection">
+    Once connected, you'll see:
+    ```
+    ✅ Connected to WhatsApp successfully!
+    📝 Bot is now listening for messages...
+    ```
+  </Step>
+</Steps>
+
+### Authentication Persistence
+
+Authentication data is stored in the `auth_info` directory:
+
+```
+auth_info/
+├── creds.json
+└── app-state-sync-key-*.json
+```
+
+<Warning>
+  **Important:**
+  - Backup the `auth_info` directory regularly
+  - Never commit `auth_info` to version control
+  - If deleted, you'll need to re-authenticate with the QR code
+  - Keep this directory secure (contains session credentials)
+</Warning>
+
+## Monitoring and Logs
+
+The bot uses `pino` for logging (configured in `src/index.ts:20`).
+
+**Log Levels:**
+- Default: `info`
+- For debugging: Change to `debug` in `src/index.ts`
+
+```typescript
+const logger = pino({ level: 'debug' }); // Enable verbose logging
+```
+
+**Log Output:**
+```bash
+# With PM2
+pm2 logs whatsapp-bot
+
+# With systemd
+sudo journalctl -u whatsapp-bot -f
+
+# Direct output
+npm start 2>&1 | tee bot.log
+```
+
+## Backup and Recovery
+
+### Critical Files to Backup
+
+1. **auth_info/** - WhatsApp session data
+2. **.env** - Environment configuration
+3. **PostgreSQL database** - User data, todos, reminders, etc.
+
+**Backup Script:**
+```bash
+#!/bin/bash
+
+# Backup auth_info
+tar -czf auth_info_backup_$(date +%Y%m%d).tar.gz auth_info/
+
+# Backup database
+pg_dump $DATABASE_URL > db_backup_$(date +%Y%m%d).sql
+
+# Copy to safe location
+scp *.tar.gz *.sql backup-server:/backups/
+```
+
+### Recovery
+
+<Steps>
+  <Step title="Restore auth_info">
+    ```bash
+    tar -xzf auth_info_backup_20260303.tar.gz
+    ```
+  </Step>
+
+  <Step title="Restore Database">
+    ```bash
+    psql $DATABASE_URL < db_backup_20260303.sql
+    ```
+  </Step>
+
+  <Step title="Restart Bot">
+    ```bash
+    pm2 restart whatsapp-bot
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Connection Issues
+
+**Problem:** Bot keeps disconnecting
+
+**Solutions:**
+- Check internet connection stability
+- Ensure server has sufficient resources (RAM, CPU)
+- Review logs for error messages
+- Verify WhatsApp account is not logged in elsewhere
+
+### QR Code Not Displaying
+
+**Problem:** QR code doesn't appear in terminal
+
+**Solutions:**
+- Ensure terminal supports Unicode characters
+- Check that `printQRInTerminal` is set to `false` (uses qrcode-terminal instead)
+- Verify `qrcode-terminal` package is installed
+
+### Port Already in Use
+
+**Problem:** `Error: listen EADDRINUSE: address already in use :::3000`
+
+**Solutions:**
+```bash
+# Find process using port
+lsof -i :3000
+
+# Kill process
+kill -9 <PID>
+
+# Or change PORT in .env
+PORT=3001
+```
+
+### Database Connection Failed
+
+**Problem:** `PostgreSQL connection error`
+
+**Solutions:**
+- Verify `DATABASE_URL` is correct
+- Check database is running and accessible
+- Ensure SSL is configured (`sslmode=require`)
+- Test connection manually:
+  ```bash
+  psql "$DATABASE_URL"
+  ```
+
+## Performance Optimization
+
+### Database Connection Pool
+
+The bot uses a connection pool with max 10 connections (`src/db/index.ts:16-18`):
+
+```typescript
+const client = postgres(DATABASE_URL, {
+    ssl: 'require',
+    max: 10  // Adjust based on your load
+});
+```
+
+For higher traffic, increase the pool size:
+```typescript
+max: 20  // Higher concurrency
+```
+
+### Memory Management
+
+The bot stores messages in memory for retries (`src/index.ts:25`):
+
+```typescript
+const messageStore = new Map<string, proto.IMessage>();
+```
+
+For production, consider:
+- Implementing message store cleanup
+- Using Redis for distributed message storage
+- Monitoring memory usage with PM2
+
+<Info>
+  Set PM2's `max_memory_restart` to automatically restart if memory exceeds threshold.
+</Info>
+
+## Security Considerations
+
+<Warning>
+  **Production Security Checklist:**
+  - Never expose `.env` or `auth_info` publicly
+  - Use HTTPS for Spotify callback URLs in production
+  - Implement rate limiting for message handlers
+  - Regularly update dependencies: `npm audit fix`
+  - Use non-root user for running the bot
+  - Enable firewall rules (only allow necessary ports)
+  - Rotate database credentials periodically
+  - Monitor logs for suspicious activity
+</Warning>

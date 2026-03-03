@@ -1,0 +1,210 @@
+---
+title: Notify Command
+description: Set time-based reminders to get notifications in WhatsApp
+---
+
+The `!notify` command creates reminders that will send you a WhatsApp message at a specified time in the future.
+
+## Basic Usage
+
+```
+!notify <task> <time>
+```
+
+<ParamField path="task" type="string" required>
+  The reminder message or task description
+</ParamField>
+
+<ParamField path="time" type="string" required>
+  Duration from now when you want to be reminded. Supports formats like `30m`, `1h`, `2h30m`
+</ParamField>
+
+## Examples
+
+### Simple Reminders
+
+```
+!notify call mom 30m
+```
+
+**Response:**
+```
+✅ Reminder set: "call mom" in 30m
+```
+
+### Hour-based Reminders
+
+```
+!notify buy groceries 1h
+```
+
+**Response:**
+```
+✅ Reminder set: "buy groceries" in 1h
+```
+
+### Complex Durations
+
+```
+!notify team meeting 2h30m
+```
+
+**Response:**
+```
+✅ Reminder set: "team meeting" in 2h 30m
+```
+
+## Time Format
+
+The time parameter supports flexible formats:
+
+| Format | Description | Example |
+|--------|-------------|----------|
+| `<number>m` | Minutes only | `30m` = 30 minutes |
+| `<number>h` | Hours only | `2h` = 2 hours |
+| `<number>h<number>m` | Hours and minutes | `1h30m` = 1 hour 30 min |
+
+<Note>
+  The time parser extracts hours and minutes from the string, so `2h30m` and `30m2h` both work (though the first format is recommended for clarity).
+</Note>
+
+## How It Works
+
+<Steps>
+  <Step title="Parse the command">
+    The bot separates your task description from the time duration. The last argument is treated as the time, everything before it is the task.
+    
+    Example: `!notify call dentist tomorrow 45m`
+    - Task: "call dentist tomorrow"
+    - Time: "45m"
+  </Step>
+  
+  <Step title="Calculate reminder time">
+    The bot calculates the exact time to send the reminder using the current time plus the duration you specified.
+    
+    Implementation in NotifyHandler.ts:36:
+    ```typescript
+    const reminderTime = moment().add(duration, 'minutes').toDate();
+    ```
+  </Step>
+  
+  <Step title="Store the reminder">
+    The reminder is saved to the database with your user ID, task, and scheduled time.
+    
+    From NotifyHandler.ts:39-43:
+    ```typescript
+    await ReminderService.create(
+        sender,
+        task,
+        reminderTime
+    );
+    ```
+  </Step>
+  
+  <Step title="Send confirmation">
+    You receive immediate confirmation showing exactly what was scheduled.
+  </Step>
+  
+  <Step title="Receive notification">
+    At the scheduled time, the bot sends you a WhatsApp message with your reminder.
+  </Step>
+</Steps>
+
+## Error Handling
+
+### Missing Parameters
+
+```
+!notify
+```
+
+**Response:**
+```
+Usage: !notify <task> <time>
+```
+
+### Missing Time
+
+```
+!notify call mom
+```
+
+**Response:**
+```
+Usage: !notify <task> <time>
+```
+
+### Invalid Time Format
+
+```
+!notify meeting tomorrow
+```
+
+**Response:**
+```
+Invalid time format. Examples: 30m, 1h, 2h30m
+```
+
+<Warning>
+  If the time string doesn't contain valid hour (`h`) or minute (`m`) markers, the reminder will fail. Always include units like `30m` instead of just `30`.
+</Warning>
+
+## Implementation Details
+
+### Time Parser
+
+From NotifyHandler.ts:59-73, the time parser uses regex to extract hours and minutes:
+
+```typescript
+function parseTimeString(timeStr: string): number | null {
+    const hourMatch = timeStr.match(/(\d+)h/);
+    const minuteMatch = timeStr.match(/(\d+)m/);
+
+    let totalMinutes = 0;
+
+    if (hourMatch) {
+        totalMinutes += parseInt(hourMatch[1]) * 60;
+    }
+    if (minuteMatch) {
+        totalMinutes += parseInt(minuteMatch[1]);
+    }
+
+    return totalMinutes > 0 ? totalMinutes : null;
+}
+```
+
+### Duration Formatting
+
+The confirmation message formats the duration in a human-readable way (NotifyHandler.ts:75-86):
+
+```typescript
+function formatDuration(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+
+    if (hours > 0 && mins > 0) {
+        return `${hours}h ${mins}m`;
+    } else if (hours > 0) {
+        return `${hours}h`;
+    } else {
+        return `${mins}m`;
+    }
+}
+```
+
+<Accordion title="Can I set multiple reminders?">
+  Yes! Each `!notify` command creates a separate reminder. You can have multiple reminders scheduled at different times.
+</Accordion>
+
+<Accordion title="What's the maximum reminder duration?">
+  The code doesn't impose a maximum limit, but extremely long durations should be used cautiously as they depend on the bot staying online.
+</Accordion>
+
+<Accordion title="Can I cancel a reminder?">
+  The current implementation doesn't include a cancel feature. Once set, reminders will trigger at their scheduled time. This could be a future enhancement.
+</Accordion>
+
+## Related Commands
+
+- [!timer](/commands/timer) - For countdown timers instead of specific task reminders
+- [!todo](/commands/todo) - For managing ongoing tasks without time constraints

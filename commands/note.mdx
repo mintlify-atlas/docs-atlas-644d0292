@@ -1,0 +1,342 @@
+---
+title: Note Command
+description: Save, search, and manage notes in WhatsApp
+---
+
+The `!note` command lets you save important information, snippets, and ideas directly in WhatsApp with full search capabilities.
+
+## Subcommands
+
+```
+!note <save|list|view|delete|search> [arguments]
+```
+
+## Save Notes
+
+Store text notes for future reference.
+
+```
+!note save <content>
+```
+
+**Example:**
+```
+!note save Remember to buy milk
+```
+
+**Response:**
+```
+📝 Note saved successfully!
+```
+
+**More Examples:**
+```
+!note save Meeting notes: Discussed Q4 roadmap, launch date is Dec 15
+!note save API key: sk-1234567890abcdef
+!note save Recipe: 2 cups flour, 1 egg, 1/2 cup milk
+```
+
+<Note>
+  Notes can be of any length and contain any text. The entire content after `save` is stored as a single note.
+</Note>
+
+## List Notes
+
+View all your saved notes with previews.
+
+```
+!note list
+```
+
+**Response:**
+```
+📚 Your Notes:
+1. Remember to buy milk
+2. Meeting notes: Discussed Q4 roadmap, launch...
+3. API key: sk-1234567890abcdef
+```
+
+<ParamField path="preview" type="string">
+  Long notes are automatically truncated to 50 characters with `...` appended. Use `!note view` to see the full content.
+</ParamField>
+
+### Empty Notes List
+
+```
+!note list
+```
+
+**Response:**
+```
+No notes found.
+```
+
+## View Full Note
+
+Display the complete content of a specific note.
+
+```
+!note view <number>
+```
+
+**Example:**
+```
+!note view 2
+```
+
+**Response:**
+```
+📖 Note #2:
+Meeting notes: Discussed Q4 roadmap, launch date is Dec 15, need to finalize marketing materials
+```
+
+This is particularly useful for notes that were truncated in the list view.
+
+## Delete Notes
+
+Permanently remove a note.
+
+```
+!note delete <number>
+```
+
+**Example:**
+```
+!note delete 1
+```
+
+**Response:**
+```
+🗑️ Note deleted successfully!
+```
+
+<Warning>
+  Deletion is permanent. There's no undo functionality, so make sure you're deleting the correct note number.
+</Warning>
+
+## Search Notes
+
+Find notes containing specific keywords.
+
+```
+!note search <query>
+```
+
+**Example:**
+```
+!note search meeting
+```
+
+**Response:**
+```
+🔍 Search Results for "meeting":
+1. Meeting notes: Discussed Q4 roadmap, launch...
+2. Schedule meeting with design team on Friday
+```
+
+### No Results
+
+```
+!note search xyz123
+```
+
+**Response:**
+```
+No notes found matching your search.
+```
+
+<Note>
+  Search is case-insensitive and matches partial words. The query "meet" would match notes containing "meeting", "Meet", or "MEET".
+</Note>
+
+## Common Use Cases
+
+<Steps>
+  <Step title="Quick Information Storage">
+    Save information you need to reference later
+    ```
+    !note save WiFi password: MySecurePass123
+    !note save Parking spot: Level 3, Section B
+    ```
+  </Step>
+  
+  <Step title="Meeting Notes">
+    Capture key points during meetings
+    ```
+    !note save Team sync: Need to review PRs, deploy by EOD, John on vacation next week
+    ```
+  </Step>
+  
+  <Step title="Code Snippets">
+    Store useful code or commands
+    ```
+    !note save Git reset: git reset --hard HEAD~1
+    !note save Docker cleanup: docker system prune -a
+    ```
+  </Step>
+  
+  <Step title="Retrieve Later">
+    Search or list to find your notes
+    ```
+    !note search git
+    !note view 5
+    ```
+  </Step>
+</Steps>
+
+## Parameters
+
+<ParamField path="save" type="subcommand">
+  Save a new note.
+  
+  **Required:** Note content (any text)
+  
+  **Example:** `!note save Important meeting tomorrow at 3pm`
+</ParamField>
+
+<ParamField path="list" type="subcommand">
+  Display all notes with previews (50 char limit).
+  
+  **Arguments:** None
+  
+  **Example:** `!note list`
+</ParamField>
+
+<ParamField path="view" type="subcommand">
+  Show the full content of a specific note.
+  
+  **Required:** Note number (from list)
+  
+  **Example:** `!note view 3`
+</ParamField>
+
+<ParamField path="delete" type="subcommand">
+  Delete a note permanently.
+  
+  **Required:** Note number (from list)
+  
+  **Example:** `!note delete 2`
+</ParamField>
+
+<ParamField path="search" type="subcommand">
+  Find notes containing specific text.
+  
+  **Required:** Search query (one or more words)
+  
+  **Example:** `!note search password`
+</ParamField>
+
+## Error Handling
+
+### No Subcommand
+
+```
+!note
+```
+
+**Response:**
+```
+Usage: !note <save/list/view/delete/search> [content/number/query]
+```
+
+### Invalid Subcommand
+
+```
+!note update 1
+```
+
+**Response:**
+```
+Unknown subcommand. Use: save, list, view, delete, or search.
+```
+
+### Missing Content
+
+```
+!note save
+```
+
+**Response:**
+```
+Please specify the note content.
+```
+
+### Invalid Note Number
+
+```
+!note view 999
+```
+
+**Response:**
+```
+Invalid note number.
+```
+
+### Missing Search Query
+
+```
+!note search
+```
+
+**Response:**
+```
+Please specify a search query.
+```
+
+## Implementation Details
+
+### Preview Truncation
+
+From NoteHandler.ts:44-48, notes longer than 50 characters are truncated in list view:
+
+```typescript
+const noteList = notes.map((note, index) => {
+    const preview = note.content.length > 50
+        ? note.content.substring(0, 47) + '...'
+        : note.content;
+    return `${index + 1}. ${preview}`;
+}).join('\n');
+```
+
+### Search Implementation
+
+Search results use the same preview format as the list view (NoteHandler.ts:115-120):
+
+```typescript
+const resultList = searchResults.map((note, index) => {
+    const preview = note.content.length > 50
+        ? note.content.substring(0, 47) + '...'
+        : note.content;
+    return `${index + 1}. ${preview}`;
+}).join('\n');
+```
+
+### Note Indexing
+
+Notes are displayed with 1-based indexing (1, 2, 3...) for user-friendliness, but stored with database IDs internally.
+
+<Accordion title="Are notes private?">
+  Notes are associated with your user ID (sender), so they're private to you regardless of which chat you're in. You can access your notes from any conversation with the bot.
+</Accordion>
+
+<Accordion title="Is there a limit to note length?">
+  The code doesn't impose a hard limit, but extremely long notes should be broken into multiple notes for easier management and searching.
+</Accordion>
+
+<Accordion title="Can I edit a note?">
+  The current implementation doesn't support editing. To modify a note, view it, delete it, and save a new version:
+  ```
+  !note view 3
+  !note delete 3
+  !note save Updated content here
+  ```
+</Accordion>
+
+<Accordion title="How does search work?">
+  The search functionality queries the database for notes containing your search term. It's handled by the NoteService.search() method which performs pattern matching on note content.
+</Accordion>
+
+## Related Commands
+
+- [!todo](/commands/todo) - For actionable tasks rather than reference information
+- [!notify](/commands/notify) - Set reminders for time-sensitive notes

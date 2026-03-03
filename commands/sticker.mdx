@@ -1,0 +1,316 @@
+---
+title: Sticker Command
+description: Convert images, videos, and GIFs into WhatsApp stickers
+---
+
+The `!sticker` command transforms images, videos, GIFs, and even existing stickers into custom WhatsApp stickers that you can use in conversations.
+
+## Basic Usage
+
+```
+!sticker [f/full]
+```
+
+The command works in two ways:
+1. Send an image/video with `!sticker` as the caption
+2. Reply to an image/video/sticker message with `!sticker`
+
+## Creating Stickers
+
+### From Image (Caption)
+
+<Steps>
+  <Step title="Select an image">
+    Choose an image from your gallery or camera
+  </Step>
+  
+  <Step title="Add caption">
+    Type `!sticker` in the caption field
+  </Step>
+  
+  <Step title="Send">
+    Send the message, and the bot will reply with your sticker
+  </Step>
+</Steps>
+
+### From Image (Reply)
+
+<Steps>
+  <Step title="Find the image">
+    Locate an existing image message in the chat
+  </Step>
+  
+  <Step title="Reply with command">
+    Reply to that message with `!sticker`
+  </Step>
+  
+  <Step title="Receive sticker">
+    The bot converts the image and sends back the sticker
+  </Step>
+</Steps>
+
+## Sticker Formats
+
+### Cropped (Default)
+
+Creates a standard square sticker with cropped/centered content.
+
+```
+!sticker
+```
+
+From StickerHandler.ts:85, this uses `StickerTypes.CROPPED`:
+```typescript
+type: isFull ? StickerTypes.FULL : StickerTypes.CROPPED
+```
+
+### Full Size
+
+Preserves the original aspect ratio without cropping.
+
+```
+!sticker f
+```
+
+or
+
+```
+!sticker full
+```
+
+<ParamField path="f" type="flag" default="false">
+  Short form for full-size sticker mode
+</ParamField>
+
+<ParamField path="full" type="flag" default="false">
+  Long form for full-size sticker mode
+</ParamField>
+
+## Supported Media Types
+
+| Media Type | Supported | Notes |
+|------------|-----------|-------|
+| Images (JPG, PNG) | ✅ | Best quality results |
+| Videos | ✅ | Max 10 seconds |
+| GIFs | ✅ | Max 10 seconds |
+| Existing Stickers | ✅ | Can convert between formats |
+
+## Limitations
+
+### Video Length
+
+Videos and GIFs are limited to 10 seconds maximum. From StickerHandler.ts:35-38:
+
+```typescript
+if (isVideo && (targetMessage.videoMessage?.seconds || 0) > 10) {
+    await socket.sendMessage(chat, { 
+        text: '❌ Video is too long. Please send a video/GIF with a maximum length of 10 seconds.' 
+    });
+}
+```
+
+**Error Example:**
+```
+!sticker (on 15-second video)
+
+❌ Video is too long. Please send a video/GIF with a maximum length of 10 seconds.
+```
+
+### File Size
+
+Maximum file size is 10MB to prevent memory issues. From StickerHandler.ts:41-46:
+
+```typescript
+const fileLength = Number(targetMessage.imageMessage?.fileLength || targetMessage.videoMessage?.fileLength || targetMessage.stickerMessage?.fileLength || 0);
+const maxSizeBytes = 10 * 1024 * 1024; // 10MB limit
+if (fileLength > maxSizeBytes) {
+    await socket.sendMessage(chat, { text: '❌ File is too large. Please send a file smaller than 10MB.' });
+}
+```
+
+**Error Example:**
+```
+!sticker (on 15MB image)
+
+❌ File is too large. Please send a file smaller than 10MB.
+```
+
+## Sticker Metadata
+
+Every sticker is created with custom metadata:
+
+<ParamField path="pack" type="string" default="game">
+  The sticker pack name visible in WhatsApp
+</ParamField>
+
+<ParamField path="author" type="string">
+  Your WhatsApp display name (pushName) or phone number
+</ParamField>
+
+<ParamField path="categories" type="array" default="['✨']">
+  Sticker categories/emojis
+</ParamField>
+
+<ParamField path="quality" type="number" default="75">
+  JPEG quality (0-100) for optimization
+</ParamField>
+
+From StickerHandler.ts:82-89:
+```typescript
+const sticker = new Sticker(buffer, {
+    pack: packName,
+    author: authorName,
+    type: isFull ? StickerTypes.FULL : StickerTypes.CROPPED,
+    categories: ['✨'],
+    id: 'com.openclaw.sticker.pack',
+    quality: 75
+});
+```
+
+## Error Handling
+
+### No Media Provided
+
+```
+!sticker
+```
+
+**Response:**
+```
+❌ Please send an image/video with !sticker or reply to one.
+```
+
+### Unsupported Media Type
+
+```
+!sticker (on audio file)
+```
+
+**Response:**
+```
+❌ Please send an image/video with !sticker or reply to one (image/video/sticker).
+```
+
+### Processing Failed
+
+If the sticker creation process encounters an error:
+
+**Response:**
+```
+❌ Failed to create sticker.
+```
+
+## Advanced Usage
+
+### Converting Sticker Formats
+
+You can convert an existing cropped sticker to full size:
+
+<Steps>
+  <Step title="Find cropped sticker">
+    Locate a sticker that was cropped
+  </Step>
+  
+  <Step title="Reply with full flag">
+    Reply to it with:
+    ```
+    !sticker full
+    ```
+  </Step>
+  
+  <Step title="Get full version">
+    Receive the same sticker in full-size format
+  </Step>
+</Steps>
+
+### Batch Processing
+
+For multiple images:
+
+<Steps>
+  <Step title="Send images separately">
+    Send each image you want to convert
+  </Step>
+  
+  <Step title="Reply to each">
+    Reply to each image with `!sticker`
+  </Step>
+  
+  <Step title="Collect stickers">
+    Each will be processed independently
+  </Step>
+</Steps>
+
+## Implementation Details
+
+### Media Download
+
+The bot downloads media using Baileys' `downloadMediaMessage` function (StickerHandler.ts:66-74):
+
+```typescript
+const buffer = await downloadMediaMessage(
+    msgToDownload,
+    'buffer',
+    {},
+    {
+        logger: socket.logger,
+        reuploadRequest: socket.updateMediaMessage
+    }
+);
+```
+
+### Sticker Creation
+
+Stickers are created using the `wa-sticker-formatter` library, which handles the conversion to WhatsApp's sticker format.
+
+### Author Name
+
+The sticker author is set to your WhatsApp display name, falling back to your phone number prefix (StickerHandler.ts:77):
+
+```typescript
+const authorName = message.pushName || (sender ? sender.split('@')[0] : 'WhatsApp Bot');
+```
+
+<Accordion title="Why do my stickers show 'game' as the pack name?">
+  The pack name is hardcoded to "game" in the current implementation (StickerHandler.ts:78). This could be made configurable in a future update.
+</Accordion>
+
+<Accordion title="Can I create animated stickers?">
+  Yes! Send a GIF or short video (max 10 seconds) with `!sticker`. The bot will convert it to an animated sticker.
+</Accordion>
+
+<Accordion title="What's the difference between cropped and full?">
+  - **Cropped**: Centers and crops the image to fill a square sticker (default WhatsApp behavior)
+  - **Full**: Preserves the original aspect ratio, adding padding if needed
+  
+  Use `!sticker full` for images where you don't want any content cropped out.
+</Accordion>
+
+<Accordion title="Can I change the sticker pack name?">
+  The current implementation uses a fixed pack name. The pack name and ID are defined in StickerHandler.ts:78 and :87. To customize this, you would need to modify the source code.
+</Accordion>
+
+## Examples
+
+### Profile Picture to Sticker
+
+1. Save someone's profile picture
+2. Send it to the bot with `!sticker` caption
+3. Use the sticker in conversations
+
+### Meme to Sticker
+
+1. Find a meme image
+2. Forward it to the bot
+3. Reply with `!sticker`
+4. Share the meme sticker
+
+### Screenshot to Sticker
+
+1. Take a screenshot
+2. Send to bot with `!sticker`
+3. Creates a full-screen sticker (use `!sticker full` to preserve aspect ratio)
+
+## Related Commands
+
+- [!help](/commands/overview) - Get general help with bot commands

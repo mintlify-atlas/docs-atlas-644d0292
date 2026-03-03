@@ -1,80 +1,254 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get your WhatsApp Assistant Bot running in minutes by scanning a QR code and sending your first command
 ---
 
-## Get started in three steps
+# Quickstart
 
-Get your documentation site running locally and make your first customization.
+Get up and running with the WhatsApp Assistant Bot in under 5 minutes. This guide will walk you through starting the bot, connecting it to WhatsApp, and sending your first command.
 
-### Step 1: Set up your local environment
+<Note>
+This quickstart assumes you've already completed the [installation steps](/installation). If you haven't installed the bot yet, complete that first.
+</Note>
+
+## Start the bot
+
+<Steps>
+  <Step title="Start in development mode">
+    Open your terminal and navigate to the project directory, then start the bot:
+
+    <CodeGroup>
+    ```bash Development mode
+    npm run dev
+    ```
+
+    ```bash Production mode
+    npm start
+    ```
+    </CodeGroup>
+
+    You'll see output indicating the bot is starting:
+
+    ```bash
+    🤖 WhatsApp Reminder Bot Starting...
+
+    🌍 Main server listening on port 3000
+    🎵 Spotify Callback server listening on port 8888
+    Connected to PostgreSQL successfully
+    📱 Using WhatsApp Web v2.2431.6, isLatest: true
+    ```
+  </Step>
+
+  <Step title="Scan the QR code">
+    A QR code will appear in your terminal:
+
+    ```bash
+    📱 Scan this QR code with WhatsApp to connect:
+
+    █▀▀▀▀▀█ ▀▀█▄ █▀▀ █▀▀▀▀▀█
+    █ ███ █ ▄▀██▀ ▀█ █ ███ █
+    █ ▀▀▀ █ ██▄█▄▀▄█ █ ▀▀▀ █
+    ```
+
+    To scan it:
+
+    1. Open **WhatsApp** on your phone
+    2. Go to **Settings** → **Linked Devices**
+    3. Tap **Link a Device**
+    4. Scan the QR code displayed in your terminal
+
+    <Tip>
+    The QR code will refresh every 30 seconds if not scanned. Make sure to scan it promptly.
+    </Tip>
+  </Step>
+
+  <Step title="Connection confirmed">
+    Once scanned successfully, you'll see:
+
+    ```bash
+    ✅ Connected to WhatsApp successfully!
+    📝 Bot is now listening for messages...
+
+    Available commands:
+      !help - List all commands
+      !sticker - Convert image/gif to sticker
+      !notify <time> <message> - Set a reminder
+      !todo add <task> - Add a todo
+      !note save <title> <content> - Save a note
+    ```
+
+    Your bot is now active and ready to receive commands!
+  </Step>
+</Steps>
+
+## Send your first command
+
+Let's test the bot by sending a few commands in your WhatsApp DM.
+
+<Steps>
+  <Step title="Send the help command">
+    Open WhatsApp and send a message to yourself (or to the linked device):
+
+    ```
+    !help
+    ```
+
+    You should receive a response listing all available commands:
+
+    ```
+    📚 Available Commands:
+
+    *!notify*
+    Usage: !notify <task> <time>
+    Set a reminder for yourself
+
+    *!todo*
+    Usage: !todo <add/list/done/delete/clear>
+    Manage your persistent todo list
+
+    *!note*
+    Usage: !note <save/list/view/delete/search>
+    Manage your personal snippets
+    ...
+    ```
+  </Step>
+
+  <Step title="Set a reminder">
+    Try setting a reminder:
+
+    ```
+    !notify test reminder 5m
+    ```
+
+    You'll get a confirmation:
+
+    ```
+    ✅ Reminder set: "test reminder" in 5m
+    ```
+
+    After 5 minutes, you'll receive:
+
+    ```
+    ⏰ Reminder: test reminder
+    ```
+  </Step>
+
+  <Step title="Create a todo">
+    Add an item to your todo list:
+
+    ```
+    !todo add Buy groceries
+    ```
+
+    Response:
+
+    ```
+    ✅ Task added: Buy groceries
+    ```
+
+    List your todos:
+
+    ```
+    !todo list
+    ```
+
+    Response:
+
+    ```
+    📋 Your Todos:
+
+    1. [ ] Buy groceries
+    ```
+  </Step>
+
+  <Step title="Create a sticker">
+    Send an image, GIF, or video to yourself, then reply to it with:
+
+    ```
+    !sticker
+    ```
+
+    The bot will convert it to a WhatsApp sticker and send it back to you!
+
+    <Tip>
+    Use `!sticker f` or `!sticker full` to create a full-size sticker without cropping.
+    </Tip>
+  </Step>
+</Steps>
+
+## Verify it works
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
+  <Accordion title="Bot responds to commands">
+    When you send `!help` or any command, you should receive an immediate response. If you don't:
+
+    - Check that the bot is still running in your terminal
+    - Verify you're sending messages to yourself (DM), not a group
+    - Ensure the QR code was scanned successfully
+    - Check the terminal for error messages
   </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
+
+  <Accordion title="Reminders arrive on time">
+    When you set a reminder with `!notify`, you should receive the notification at the specified time. If reminders don't arrive:
+
+    - Check that the NotificationService initialized successfully (look for logs in terminal)
+    - Verify your system time is correct
+    - Ensure the bot process hasn't crashed
+  </Accordion>
+
+  <Accordion title="Data persists across restarts">
+    Todos, notes, and reminders should survive bot restarts:
+
+    1. Add a todo: `!todo add Test persistence`
+    2. Stop the bot (Ctrl+C)
+    3. Restart the bot: `npm run dev`
+    4. List todos: `!todo list`
+
+    You should see your todo still there. If not, check your PostgreSQL connection.
   </Accordion>
 </AccordionGroup>
 
-### Step 2: Deploy your changes
+## Common issues
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+<Warning>
+If the QR code doesn't appear or the connection fails, check these common issues:
+</Warning>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+**QR code not showing**
+- Ensure you're running the latest version of the bot
+- Check that no other WhatsApp Web sessions are blocking the connection
+- Try deleting the `auth_info/` folder and restarting
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+**Connection closes immediately**
+- Your WhatsApp account may have logged out
+- Delete the `auth_info/` folder and scan the QR code again
+- Check terminal logs for specific error messages
 
-### Step 3: Go live
+**Bot doesn't respond to commands**
+- Verify you're sending messages in a DM, not a group (groups are ignored)
+- Check that commands start with `!` (exclamation mark)
+- Look for error messages in the terminal
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+**Database connection errors**
+- Verify your `DATABASE_URL` in `.env` is correct
+- Ensure PostgreSQL is running and accessible
+- Check that SSL is properly configured (`ssl: 'require'`)
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that your bot is running, explore more features:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Command reference" icon="book">
+    Learn about all available commands and their advanced usage
+  </Card>
+  <Card title="Spotify integration" icon="spotify">
+    Connect your Spotify account to control music from WhatsApp
+  </Card>
+  <Card title="Deployment guide" icon="server">
+    Deploy your bot to a VPS or cloud provider for 24/7 availability
+  </Card>
+  <Card title="Customization" icon="wrench">
+    Add your own commands and customize bot behavior
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

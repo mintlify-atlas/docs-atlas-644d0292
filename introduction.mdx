@@ -1,0 +1,113 @@
+---
+title: Introduction
+description: A lean, personal WhatsApp assistant built with Baileys for managing reminders, tasks, notes, and more through WhatsApp DMs
+---
+
+# WhatsApp Assistant Bot
+
+A lean, personal WhatsApp assistant built with [Baileys](https://github.com/WhiskeySockets/Baileys), PostgreSQL, and Drizzle ORM. Designed for private use to manage reminders, tasks, and utilities directly through WhatsApp DMs.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running in minutes by scanning a QR code and sending your first command
+  </Card>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Complete installation guide with prerequisites, dependencies, and build steps
+  </Card>
+</CardGroup>
+
+## What is this bot?
+
+The WhatsApp Assistant Bot transforms your WhatsApp into a powerful personal productivity tool. By leveraging the Baileys library, this bot connects to WhatsApp Web and responds to your commands in real-time.
+
+**This bot is designed exclusively for direct messages (DMs)**. It explicitly ignores group messages to ensure privacy and maintain focus on your personal tasks.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Personal reminders" icon="bell">
+    Set time-based notifications with natural language like `!notify call mom 30m`
+  </Card>
+  <Card title="Task management" icon="list-check">
+    Maintain a persistent todo list with add, list, complete, and delete operations
+  </Card>
+  <Card title="Notes" icon="note-sticky">
+    Save and search through text snippets for quick reference
+  </Card>
+  <Card title="Sticker maker" icon="image">
+    Convert images, GIFs, and videos to WhatsApp stickers instantly
+  </Card>
+  <Card title="Timers" icon="clock">
+    Set countdown timers for quick alerts
+  </Card>
+  <Card title="Spotify control" icon="spotify">
+    Link your Spotify account to control playback from WhatsApp
+  </Card>
+</CardGroup>
+
+## Tech stack
+
+Built with modern technologies for reliability and performance:
+
+- **Runtime**: Node.js (ESM modules)
+- **WhatsApp**: [Baileys](https://github.com/WhiskeySockets/Baileys) (WhiskeySockets)
+- **Database**: PostgreSQL for data persistence
+- **ORM**: Drizzle ORM for type-safe database operations
+- **Image Processing**: Sharp for sticker creation
+- **Scheduling**: node-cron for reminder notifications
+- **Server**: Express for health checks and OAuth callbacks
+
+## Available commands
+
+Here's a quick overview of what you can do:
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `!notify` | `!notify <task> <time>` | Set a reminder (e.g., `!notify call mom 30m`) |
+| `!todo` | `!todo <add/list/done/delete/clear>` | Manage your persistent todo list |
+| `!note` | `!note <save/list/view/delete/search>` | Manage your personal snippets |
+| `!sticker` | `!sticker [f/full]` | Convert media to sticker (reply or caption) |
+| `!timer` | `!timer <start/list/cancel>` | Set countdown timers |
+| `!help` | `!help [command]` | Show usage instructions |
+
+<Tip>
+Type `!help` in your WhatsApp chat after setup to see all available commands, or `!help <command>` for detailed usage of a specific command.
+</Tip>
+
+## Security and privacy
+
+<Warning>
+This bot is designed for **Direct Messages (DMs) only**. It explicitly ignores group messages to ensure privacy and focus.
+</Warning>
+
+- Authentication data is stored locally in the `auth_info/` folder
+- **Never share the `auth_info/` folder** as it contains your WhatsApp session credentials
+- All data is stored in your PostgreSQL database with secure connections
+- The bot only responds to messages from your own WhatsApp number
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Get started with quickstart"
+    icon="play"
+    href="/quickstart"
+  >
+    Follow our quickstart guide to scan the QR code and send your first command
+  </Card>
+  <Card
+    title="Full installation guide"
+    icon="book"
+    href="/installation"
+  >
+    Learn about prerequisites, environment setup, and production deployment
+  </Card>
+</CardGroup>

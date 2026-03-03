@@ -1,0 +1,319 @@
+---
+title: Spotify Commands
+description: Control Spotify playback directly from WhatsApp
+---
+
+Control your Spotify playback using simple WhatsApp commands. Play, pause, skip tracks, and more - all without leaving your chat.
+
+## Available Commands
+
+| Command | Action | Emoji |
+|---------|--------|-------|
+| `/play` | Resume playback | ▶️ |
+| `/pause` | Pause playback | ⏸️ |
+| `/skip` | Skip to next track | ⏭️ |
+| `/next` | Skip to next track | ⏭️ |
+
+<Note>
+  Spotify commands use the `/` prefix instead of `!`. From SpotifyHandler.ts:7, the usage is defined as:
+  ```typescript
+  usage: '/play, /pause, /skip, /next'
+  ```
+</Note>
+
+## Setup & Authentication
+
+Before using Spotify commands, you need to link your Spotify account.
+
+<Steps>
+  <Step title="Try a command">
+    Attempt any Spotify command
+    ```
+    /play
+    ```
+  </Step>
+  
+  <Step title="Receive auth link">
+    If not linked, you'll get an authentication URL:
+    ```
+    ❌ Spotify account not linked.
+
+    1. Click this link to log in: https://accounts.spotify.com/authorize?...
+    2. You will be redirected to a page that won't load.
+    3. Copy the full URL of that page and paste it here.
+    ```
+  </Step>
+  
+  <Step title="Authorize">
+    Click the link and log in to Spotify
+  </Step>
+  
+  <Step title="Copy callback URL">
+    After authorization, you'll be redirected to a URL that won't load. Copy the entire URL from your browser's address bar.
+  </Step>
+  
+  <Step title="Send URL to bot">
+    Paste the copied URL back in the WhatsApp chat
+  </Step>
+  
+  <Step title="Start controlling">
+    You're now linked! Use any Spotify command.
+  </Step>
+</Steps>
+
+## Play Music
+
+Resume playback on your active Spotify device.
+
+```
+/play
+```
+
+**Response:**
+```
+▶️ Spotify play success!
+```
+
+From SpotifyHandler.ts:31-32:
+```typescript
+const emojis = { play: '▶️', pause: '⏸️', skip: '⏭️', next: '⏭️' };
+await socket.sendMessage(chat, { text: `${emojis[action]} Spotify ${action} success!` });
+```
+
+## Pause Playback
+
+Pause the currently playing track.
+
+```
+/pause
+```
+
+**Response:**
+```
+⏸️ Spotify pause success!
+```
+
+## Skip Tracks
+
+Skip to the next track in your queue.
+
+```
+/skip
+```
+
+or
+
+```
+/next
+```
+
+**Response:**
+```
+⏭️ Spotify skip success!
+```
+
+<Note>
+  Both `/skip` and `/next` perform the same action. From SpotifyHandler.ts:18:
+  ```typescript
+  else if (cmd === 'skip' || cmd === 'next') action = 'skip';
+  ```
+</Note>
+
+## Requirements
+
+<ParamField path="Spotify Premium" type="requirement" required>
+  Spotify API playback control requires a Premium subscription. Free accounts cannot use these features.
+</ParamField>
+
+<ParamField path="Active Device" type="requirement" required>
+  You must have Spotify open and playing on at least one device (phone, computer, web player, etc.)
+</ParamField>
+
+<ParamField path="Linked Account" type="requirement" required>
+  Your WhatsApp account must be linked to your Spotify account through the bot's OAuth flow
+</ParamField>
+
+## Error Handling
+
+### Account Not Linked
+
+```
+/play
+```
+
+**Response:**
+```
+❌ Spotify account not linked.
+
+1. Click this link to log in: https://accounts.spotify.com/authorize?...
+2. You will be redirected to a page that won't load.
+3. Copy the full URL of that page and paste it here.
+```
+
+From SpotifyHandler.ts:34-38:
+```typescript
+if (error.message === 'NOT_LINKED') {
+    const authUrl = SpotifyService.getAuthUrl(sender);
+    await socket.sendMessage(chat, { 
+        text: `❌ *Spotify account not linked.*\n\n1. Click this link to log in: ${authUrl}\n2. You will be redirected to a page that won't load.\n3. *Copy the full URL* of that page and paste it here.` 
+    });
+}
+```
+
+### No Active Device
+
+```
+/play
+```
+
+**Response:**
+```
+❌ No active Spotify device found. Please open Spotify on your phone/PC and start playing something.
+```
+
+This occurs when you don't have Spotify open or actively playing on any device.
+
+**Solution:** Open Spotify on any device and start playing a song, then try the command again.
+
+### General Errors
+
+```
+/play
+```
+
+**Response:**
+```
+❌ Spotify play failed. Make sure you have Premium and an active session.
+```
+
+This can occur due to:
+- Network connectivity issues
+- Expired authentication tokens
+- Spotify API rate limits
+- Non-premium accounts
+
+### Invalid Command
+
+```
+/spotify stop
+```
+
+**Response:**
+```
+❌ Invalid Spotify action. Use /play, /pause, /skip, or /next.
+```
+
+## Command Mapping
+
+From SpotifyHandler.ts:15-22, commands are mapped to actions:
+
+```typescript
+const cmd = commandName?.toLowerCase();
+if (cmd === 'play') action = 'play';
+else if (cmd === 'pause') action = 'pause';
+else if (cmd === 'skip' || cmd === 'next') action = 'skip';
+else {
+    // Fallback for !spotify [action]
+    action = args[0]?.toLowerCase() as any;
+}
+```
+
+This means you can also use:
+```
+!spotify play
+!spotify pause
+!spotify skip
+```
+
+But the `/` commands are recommended for brevity.
+
+## Implementation Details
+
+### Playback Control
+
+From SpotifyHandler.ts:30, the bot calls the Spotify service:
+
+```typescript
+await SpotifyService.controlPlayback(sender, action);
+```
+
+The service handles:
+- OAuth token management
+- Spotify API requests
+- Device detection
+- Error handling
+
+### Supported Actions
+
+From SpotifyHandler.ts:24, only four actions are supported:
+
+```typescript
+if (!['play', 'pause', 'skip', 'next'].includes(action)) {
+    await socket.sendMessage(chat, { text: '❌ Invalid Spotify action. Use /play, /pause, /skip, or /next.' });
+}
+```
+
+## Use Cases
+
+### Quick Playback Control
+
+Control music without leaving WhatsApp:
+
+```
+/pause              # Pause for a moment
+# ... handle something ...
+/play               # Resume
+```
+
+### Skipping Songs
+
+Quickly skip tracks you don't want to hear:
+
+```
+/skip
+/skip
+/next
+```
+
+### Hands-Free Control
+
+Control playback when your hands are busy:
+- Cooking and don't want to touch your phone
+- Working out and phone is across the room
+- Driving with voice-to-text (use responsibly)
+
+<Accordion title="Why do I need Spotify Premium?">
+  Spotify's Web API only allows playback control for Premium users. Free accounts can only view currently playing information but cannot control playback. This is a limitation from Spotify, not the bot.
+</Accordion>
+
+<Accordion title="Can I search for songs or playlists?">
+  The current implementation only supports play, pause, and skip controls. Search functionality and playlist management are not implemented. These could be added as future enhancements.
+</Accordion>
+
+<Accordion title="What happens if my Spotify session expires?">
+  OAuth tokens can expire. If you get authentication errors, you may need to re-link your account by following the authentication flow again.
+</Accordion>
+
+<Accordion title="Can I control which device plays?">
+  The current implementation uses your most recently active Spotify device. There's no device selection feature, but you can control which device by making it active in Spotify before sending commands.
+</Accordion>
+
+<Accordion title="Why use /play instead of !play?">
+  The `/` prefix is used to distinguish Spotify commands from other bot commands. From the command handler registration (index.ts:27-30), both prefixes work, but `/` is the recommended convention for Spotify.
+</Accordion>
+
+## Limitations
+
+- **No volume control** - Cannot adjust playback volume
+- **No track selection** - Cannot play specific songs or artists
+- **No playlist management** - Cannot browse or modify playlists
+- **No previous track** - Cannot go back to the previous song
+- **No shuffle/repeat** - Cannot toggle shuffle or repeat modes
+- **No currently playing info** - Cannot query what's playing
+
+These features could be added in future updates by extending the SpotifyService and adding new commands.
+
+## Related Commands
+
+- [!timer](/commands/timer) - Set timers for music sessions or focus periods
+- [!help](/commands/overview) - View all available commands

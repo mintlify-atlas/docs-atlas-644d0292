@@ -1,0 +1,284 @@
+---
+title: Database Configuration
+description: PostgreSQL setup and Drizzle ORM configuration for WhatsApp Assistant Bot
+---
+
+The WhatsApp Assistant Bot uses PostgreSQL as its database and Drizzle ORM for type-safe database operations.
+
+## PostgreSQL Setup
+
+<Steps>
+  <Step title="Create PostgreSQL Database">
+    Create a new PostgreSQL database for the bot. You can use a managed service like Neon, Supabase, or Railway, or set up your own PostgreSQL instance.
+
+    ```bash
+    # If using local PostgreSQL
+    createdb whatsapp_bot
+    ```
+  </Step>
+
+  <Step title="Configure Database URL">
+    Set your `DATABASE_URL` environment variable with the PostgreSQL connection string:
+
+    ```bash
+    DATABASE_URL="postgresql://username:password@host:port/database?sslmode=require"
+    ```
+
+    <Warning>
+      The application requires SSL connections. Ensure your connection string includes `sslmode=require` or configure your PostgreSQL instance to accept SSL connections.
+    </Warning>
+  </Step>
+
+  <Step title="Run Database Migrations">
+    Generate and apply database migrations using Drizzle Kit:
+
+    ```bash
+    # Generate migrations from schema
+    npx drizzle-kit generate
+
+    # Apply migrations to database
+    npx drizzle-kit push
+    ```
+  </Step>
+</Steps>
+
+## Drizzle ORM Configuration
+
+The Drizzle ORM configuration is defined in `drizzle.config.ts`:
+
+```typescript
+import { defineConfig } from 'drizzle-kit';
+import { config } from 'dotenv';
+
+config();
+
+export default defineConfig({
+    schema: './src/db/schema.ts',
+    out: './drizzle',
+    dialect: 'postgresql',
+    dbCredentials: {
+        url: process.env.DATABASE_URL!,
+    },
+    verbose: true,
+    strict: true,
+});
+```
+
+### Configuration Options
+
+- **schema**: Location of database schema definitions (`./src/db/schema.ts`)
+- **out**: Output directory for generated migrations (`./drizzle`)
+- **dialect**: Database type (`postgresql`)
+- **verbose**: Enable detailed logging during migrations
+- **strict**: Enable strict mode for type checking
+
+## Database Schema
+
+The bot uses five main tables to store user data and bot functionality:
+
+### Users Table
+
+Stores user profiles and preferences.
+
+```typescript
+export const users = pgTable('users', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull().unique(),
+    lastActive: timestamp('last_active').defaultNow(),
+    notificationsEnabled: boolean('notifications_enabled').default(true),
+    timezone: text('timezone').default('UTC'),
+    spotifyRefreshToken: text('spotify_refresh_token'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+```
+
+**Fields:**
+- `id` - UUID primary key (auto-generated)
+- `userId` - WhatsApp user ID (unique)
+- `lastActive` - Last activity timestamp
+- `notificationsEnabled` - Notification preferences
+- `timezone` - User timezone (default: UTC)
+- `spotifyRefreshToken` - Spotify integration token
+- `createdAt` / `updatedAt` - Audit timestamps
+
+### Todos Table
+
+Manages user todo items.
+
+```typescript
+export const todos = pgTable('todos', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull(),
+    chatId: text('chat_id').notNull(),
+    task: text('task').notNull(),
+    completed: boolean('completed').default(false),
+    completedAt: timestamp('completed_at'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+```
+
+**Fields:**
+- `id` - UUID primary key
+- `userId` - WhatsApp user ID
+- `chatId` - WhatsApp chat ID (group or individual)
+- `task` - Todo task description
+- `completed` - Completion status
+- `completedAt` - Completion timestamp
+- `createdAt` / `updatedAt` - Audit timestamps
+
+### Reminders Table
+
+Stores scheduled reminders.
+
+```typescript
+export const reminders = pgTable('reminders', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull(),
+    task: text('task').notNull(),
+    time: timestamp('time').notNull(),
+    notifyUsers: text('notify_users').array().default([]),
+    isCompleted: boolean('is_completed').default(false),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+```
+
+**Fields:**
+- `id` - UUID primary key
+- `userId` - Creator's WhatsApp user ID
+- `task` - Reminder message
+- `time` - Scheduled reminder time
+- `notifyUsers` - Array of user IDs to notify
+- `isCompleted` - Completion status
+- `createdAt` - Creation timestamp
+
+### Notes Table
+
+Stores user notes with optional tags.
+
+```typescript
+export const notes = pgTable('notes', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull(),
+    content: text('content').notNull(),
+    tags: text('tags').array().default([]),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+```
+
+**Fields:**
+- `id` - UUID primary key
+- `userId` - WhatsApp user ID
+- `content` - Note content
+- `tags` - Array of tags for organization
+- `createdAt` / `updatedAt` - Audit timestamps
+
+### Timers Table
+
+Manages active countdown timers.
+
+```typescript
+export const timers = pgTable('timers', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull(),
+    duration: integer('duration').notNull(),
+    endTime: timestamp('end_time').notNull(),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+```
+
+**Fields:**
+- `id` - UUID primary key
+- `userId` - WhatsApp user ID
+- `duration` - Timer duration in seconds
+- `endTime` - Calculated end time
+- `isActive` - Timer status
+- `createdAt` - Creation timestamp
+
+## Database Connection
+
+The database connection is configured in `src/db/index.ts`:
+
+```typescript
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+
+const client = postgres(DATABASE_URL, {
+    ssl: 'require',
+    max: 10
+});
+
+export const db = drizzle(client, { schema });
+```
+
+**Connection Options:**
+- `ssl: 'require'` - Enforces SSL connections
+- `max: 10` - Connection pool with maximum 10 connections
+
+<Note>
+  The application validates the `DATABASE_URL` on startup and exits if it's not configured.
+</Note>
+
+## Type Safety
+
+Drizzle ORM provides TypeScript types for all schema definitions:
+
+```typescript
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Todo = typeof todos.$inferSelect;
+export type NewTodo = typeof todos.$inferInsert;
+export type Reminder = typeof reminders.$inferSelect;
+export type NewReminder = typeof reminders.$inferInsert;
+export type Note = typeof notes.$inferSelect;
+export type NewNote = typeof notes.$inferInsert;
+export type Timer = typeof timers.$inferSelect;
+export type NewTimer = typeof timers.$inferInsert;
+```
+
+These types are automatically inferred from the schema and provide compile-time type checking for all database operations.
+
+## Migration Workflow
+
+<Steps>
+  <Step title="Modify Schema">
+    Update the schema definitions in `src/db/schema.ts` with your changes.
+  </Step>
+
+  <Step title="Generate Migration">
+    ```bash
+    npx drizzle-kit generate
+    ```
+    This creates a new migration file in the `./drizzle` directory.
+  </Step>
+
+  <Step title="Review Migration">
+    Check the generated SQL migration file to ensure it matches your intended changes.
+  </Step>
+
+  <Step title="Apply Migration">
+    ```bash
+    npx drizzle-kit push
+    ```
+    This applies the migration to your database.
+  </Step>
+</Steps>
+
+<Info>
+  Drizzle Kit supports both push-based (for development) and migration-based (for production) workflows. Use `drizzle-kit push` for rapid development and `drizzle-kit migrate` for production deployments.
+</Info>
+
+## Database Relationships
+
+While the schema doesn't use foreign key constraints, tables are related through user IDs:
+
+- All tables reference `userId` (WhatsApp user ID)
+- `todos` table also includes `chatId` for group chat support
+- `reminders` table includes an array of `notifyUsers` for multi-user notifications
+
+<Note>
+  The schema uses text-based user IDs from WhatsApp rather than foreign keys to maintain flexibility and avoid referential integrity issues with external user identifiers.
+</Note>

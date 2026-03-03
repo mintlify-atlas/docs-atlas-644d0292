@@ -1,0 +1,346 @@
+---
+title: Todo Command
+description: Manage your tasks and todo list directly in WhatsApp
+---
+
+The `!todo` command provides a complete task management system within WhatsApp. Create, view, complete, and delete tasks easily.
+
+## Subcommands
+
+```
+!todo <add|list|done|delete|clear> [arguments]
+```
+
+## Add Tasks
+
+Create new tasks in your todo list.
+
+### Single Task
+
+```
+!todo add Buy groceries
+```
+
+**Response:**
+```
+✅ Todo added: Buy groceries
+```
+
+### Multiple Tasks
+
+Add multiple tasks at once by separating them with commas:
+
+```
+!todo add task1, task2, task3
+```
+
+**Example:**
+```
+!todo add Buy milk, Call dentist, Finish report
+```
+
+**Response:**
+```
+✅ Added multiple todos:
+1. Buy milk
+2. Call dentist
+3. Finish report
+```
+
+<Note>
+  From TodoHandler.ts:35-36, tasks are split by commas and trimmed:
+  ```typescript
+  const tasks = taskInput.split(',').map(task => task.trim()).filter(task => task.length > 0);
+  ```
+</Note>
+
+## List Tasks
+
+View all your current tasks with their completion status.
+
+```
+!todo list
+```
+
+**Response:**
+```
+📝 Todo List:
+1. ○ Buy groceries
+2. ✓ Call mom
+3. ○ Finish documentation
+```
+
+<ParamField path="○" type="symbol">
+  Indicates an incomplete task
+</ParamField>
+
+<ParamField path="✓" type="symbol">
+  Indicates a completed task
+</ParamField>
+
+### Empty List
+
+```
+!todo list
+```
+
+**Response:**
+```
+No todos found.
+```
+
+## Mark Tasks Complete
+
+Mark a specific task as done using its number from the list.
+
+```
+!todo done <number>
+```
+
+**Example:**
+```
+!todo done 1
+```
+
+**Response:**
+```
+✅ Marked as done: Buy groceries
+```
+
+<Warning>
+  The task number must be valid (from your current todo list). Invalid numbers will return an error.
+</Warning>
+
+## Delete Tasks
+
+Permanently remove a task from your list.
+
+```
+!todo delete <number>
+```
+
+**Example:**
+```
+!todo delete 2
+```
+
+**Response:**
+```
+🗑️ Deleted: Call mom
+```
+
+<Note>
+  From TodoHandler.ts:102, delete operations include completed tasks:
+  ```typescript
+  const todos3 = await TodoService.list(chat, true);
+  ```
+</Note>
+
+## Clear Completed Tasks
+
+Remove all completed tasks at once to clean up your list.
+
+```
+!todo clear
+```
+
+**Response:**
+```
+🧹 Cleared 3 completed todos.
+```
+
+This is useful for maintaining a clean todo list with only active tasks.
+
+## Complete Workflow
+
+<Steps>
+  <Step title="Add your tasks">
+    Start by adding tasks to your list
+    ```
+    !todo add Write docs, Review code, Deploy update
+    ```
+  </Step>
+  
+  <Step title="View your list">
+    Check what's on your plate
+    ```
+    !todo list
+    ```
+    Response:
+    ```
+    📝 Todo List:
+    1. ○ Write docs
+    2. ○ Review code
+    3. ○ Deploy update
+    ```
+  </Step>
+  
+  <Step title="Complete tasks">
+    Mark tasks as done as you finish them
+    ```
+    !todo done 1
+    !todo done 2
+    ```
+  </Step>
+  
+  <Step title="Clean up">
+    Remove completed tasks
+    ```
+    !todo clear
+    ```
+    Response:
+    ```
+    🧹 Cleared 2 completed todos.
+    ```
+  </Step>
+</Steps>
+
+## Parameters
+
+<ParamField path="add" type="subcommand">
+  Add one or more tasks. Tasks can be separated by commas for bulk addition.
+  
+  **Required:** Task description(s)
+  
+  **Example:** `!todo add Buy milk, Call dentist`
+</ParamField>
+
+<ParamField path="list" type="subcommand">
+  Display all tasks with their completion status.
+  
+  **Arguments:** None
+  
+  **Example:** `!todo list`
+</ParamField>
+
+<ParamField path="done" type="subcommand">
+  Mark a task as completed.
+  
+  **Required:** Task number (from list)
+  
+  **Example:** `!todo done 1`
+</ParamField>
+
+<ParamField path="delete" type="subcommand">
+  Permanently delete a task.
+  
+  **Required:** Task number (from list)
+  
+  **Example:** `!todo delete 2`
+</ParamField>
+
+<ParamField path="clear" type="subcommand">
+  Remove all completed tasks.
+  
+  **Arguments:** None
+  
+  **Example:** `!todo clear`
+</ParamField>
+
+## Error Handling
+
+### No Subcommand
+
+```
+!todo
+```
+
+**Response:**
+```
+Usage: !todo <add/list/done/delete/clear> [task/number]
+```
+
+### Invalid Subcommand
+
+```
+!todo edit 1
+```
+
+**Response:**
+```
+Unknown subcommand. Use: add, list, done, delete, or clear.
+```
+
+### Missing Task Number
+
+```
+!todo done
+```
+
+**Response:**
+```
+Please specify the todo number to mark as done.
+```
+
+### Invalid Task Number
+
+```
+!todo done 99
+```
+
+**Response:**
+```
+Invalid todo number.
+```
+
+### No Task Content
+
+```
+!todo add
+```
+
+**Response:**
+```
+Please specify a task to add.
+```
+
+## Implementation Details
+
+### Task Indexing
+
+Tasks are displayed with 1-based indexing for user-friendliness, but stored with database IDs internally. From TodoHandler.ts:63-65:
+
+```typescript
+const todoList = todos.map((todo, index) =>
+    `${index + 1}. ${todo.completed ? '✓' : '○'} ${todo.task}`
+).join('\n');
+```
+
+### Batch Addition
+
+The comma-separated batch addition feature processes each task individually (TodoHandler.ts:44-46):
+
+```typescript
+const addedTasks = await Promise.all(
+    tasks.map(task => TodoService.create(sender, chat, task))
+);
+```
+
+### Completion Tracking
+
+Completed tasks remain in the list (marked with ✓) until you run `!todo clear`.
+
+<Accordion title="Are todos private to me?">
+  Todos are associated with the chat context. In direct messages with the bot, they're private to you. In group chats, they're shared with the group.
+</Accordion>
+
+<Accordion title="Can I edit a task after creating it?">
+  The current implementation doesn't support editing. You can delete and re-add a task instead:
+  ```
+  !todo delete 1
+  !todo add Updated task description
+  ```
+</Accordion>
+
+<Accordion title="What happens to completed tasks?">
+  Completed tasks stay in your list (marked with ✓) until you run `!todo clear`. This lets you review what you've accomplished before cleaning up.
+</Accordion>
+
+<Accordion title="Can I uncomplete a task?">
+  The current implementation doesn't support marking tasks as incomplete. If you accidentally marked something done, you can delete it and add it again.
+</Accordion>
+
+## Related Commands
+
+- [!notify](/commands/notify) - Set time-based reminders for tasks
+- [!note](/commands/note) - Save reference information related to tasks

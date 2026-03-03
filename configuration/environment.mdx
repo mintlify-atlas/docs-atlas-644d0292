@@ -1,0 +1,273 @@
+---
+title: Environment Variables
+description: Required and optional environment variables for WhatsApp Assistant Bot
+---
+
+The WhatsApp Assistant Bot uses environment variables for configuration. Create a `.env` file in the root directory to configure your bot.
+
+## Required Variables
+
+### DATABASE_URL
+
+PostgreSQL connection string for the database.
+
+```bash
+DATABASE_URL="postgresql://username:password@host:port/database?sslmode=require"
+```
+
+<Warning>
+  This variable is **required**. The application will exit on startup if `DATABASE_URL` is not set.
+</Warning>
+
+**Format:**
+```
+postgresql://[user]:[password]@[host]:[port]/[database]?sslmode=require
+```
+
+**Examples:**
+
+```bash
+# Neon Database
+DATABASE_URL="postgresql://user:password@ep-example.neon.tech/dbname?sslmode=require"
+
+# Supabase
+DATABASE_URL="postgresql://postgres:password@db.xxx.supabase.co:5432/postgres?sslmode=require"
+
+# Railway
+DATABASE_URL="postgresql://postgres:password@containers.railway.app:5432/railway?sslmode=require"
+
+# Local PostgreSQL
+DATABASE_URL="postgresql://postgres:password@localhost:5432/whatsapp_bot?sslmode=require"
+```
+
+<Info>
+  The connection string must include `sslmode=require` or your PostgreSQL instance must be configured to accept SSL connections (as specified in `src/db/index.ts:16-18`).
+</Info>
+
+## Optional Variables
+
+### PORT
+
+Port number for the Express server (used for health checks and Spotify callback).
+
+```bash
+PORT=3000
+```
+
+**Default:** `3000`
+
+**Usage:** The main Express server listens on this port. If not specified, the application defaults to port 3000.
+
+<Note>
+  The bot also runs a Spotify callback server on port `8888` (hardcoded in `src/index.ts:39`). This is used exclusively for Spotify OAuth callbacks.
+</Note>
+
+### SPOTIFY_CLIENT_ID
+
+Spotify API client ID for music integration features.
+
+```bash
+SPOTIFY_CLIENT_ID="your_spotify_client_id"
+```
+
+**Default:** Empty string (Spotify features disabled)
+
+**How to get:**
+1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+2. Create a new app
+3. Copy the Client ID
+
+### SPOTIFY_CLIENT_SECRET
+
+Spotify API client secret for authentication.
+
+```bash
+SPOTIFY_CLIENT_SECRET="your_spotify_client_secret"
+```
+
+**Default:** Empty string (Spotify features disabled)
+
+**How to get:**
+1. From your Spotify app dashboard
+2. Click "Show Client Secret"
+3. Copy the secret
+
+<Warning>
+  Keep your Spotify Client Secret secure. Never commit it to version control or share it publicly.
+</Warning>
+
+### SPOTIFY_REDIRECT_URI
+
+Callback URL for Spotify OAuth flow.
+
+```bash
+SPOTIFY_REDIRECT_URI="http://127.0.0.1:8888/callback"
+```
+
+**Default:** `http://127.0.0.1:8888/callback`
+
+**Configuration:**
+1. Add this URL to your Spotify app's "Redirect URIs" in the dashboard
+2. If deploying remotely, update to match your server URL:
+   ```bash
+   SPOTIFY_REDIRECT_URI="https://yourdomain.com:8888/callback"
+   ```
+
+<Info>
+  The redirect URI must exactly match one of the URIs configured in your Spotify app dashboard.
+</Info>
+
+## Environment File Setup
+
+Create a `.env` file in the root directory of your project:
+
+```bash
+# Database Configuration (Required)
+DATABASE_URL="postgresql://user:password@host:port/database?sslmode=require"
+
+# Server Configuration (Optional)
+PORT=3000
+
+# Spotify Integration (Optional)
+SPOTIFY_CLIENT_ID="your_spotify_client_id"
+SPOTIFY_CLIENT_SECRET="your_spotify_client_secret"
+SPOTIFY_REDIRECT_URI="http://127.0.0.1:8888/callback"
+```
+
+<Steps>
+  <Step title="Create .env File">
+    Create a `.env` file in the root directory of your project.
+  </Step>
+
+  <Step title="Add Required Variables">
+    At minimum, add your `DATABASE_URL`:
+    ```bash
+    DATABASE_URL="postgresql://user:password@host:port/database?sslmode=require"
+    ```
+  </Step>
+
+  <Step title="Add Optional Variables">
+    Add Spotify credentials if you want music integration:
+    ```bash
+    SPOTIFY_CLIENT_ID="your_client_id"
+    SPOTIFY_CLIENT_SECRET="your_client_secret"
+    SPOTIFY_REDIRECT_URI="http://127.0.0.1:8888/callback"
+    ```
+  </Step>
+
+  <Step title="Secure Your .env File">
+    Add `.env` to your `.gitignore` to prevent committing secrets:
+    ```bash
+    echo ".env" >> .gitignore
+    ```
+  </Step>
+</Steps>
+
+## Environment Variable Loading
+
+The application uses the `dotenv` package to load environment variables. This is configured in multiple locations:
+
+**Database Configuration** (`src/db/index.ts`):
+```typescript
+import dotenv from 'dotenv';
+dotenv.config();
+```
+
+**Drizzle Config** (`drizzle.config.ts`):
+```typescript
+import { config } from 'dotenv';
+config();
+```
+
+<Note>
+  Environment variables are loaded automatically when the application starts. No additional configuration is needed.
+</Note>
+
+## Validation
+
+The application validates required environment variables on startup:
+
+```typescript
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not set');
+}
+```
+
+If `DATABASE_URL` is missing, the application will exit with an error message.
+
+## Production Considerations
+
+<Warning>
+  **Security Best Practices:**
+  - Never commit `.env` files to version control
+  - Use environment variable management tools in production (e.g., AWS Secrets Manager, HashiCorp Vault)
+  - Rotate credentials regularly
+  - Use different credentials for development and production
+</Warning>
+
+### Deployment Platforms
+
+Different platforms have different ways to set environment variables:
+
+**Railway:**
+```bash
+# Set via Railway CLI
+railway variables set DATABASE_URL="postgresql://..."
+```
+
+**Heroku:**
+```bash
+# Set via Heroku CLI
+heroku config:set DATABASE_URL="postgresql://..."
+```
+
+**Docker:**
+```bash
+# Pass via docker run
+docker run -e DATABASE_URL="postgresql://..." whatsapp-bot
+
+# Or use docker-compose.yml
+environment:
+  - DATABASE_URL=postgresql://...
+```
+
+**VPS (systemd service):**
+```ini
+# In /etc/systemd/system/whatsapp-bot.service
+[Service]
+Environment="DATABASE_URL=postgresql://..."
+Environment="PORT=3000"
+```
+
+## Troubleshooting
+
+### DATABASE_URL Not Found
+
+**Error:** `DATABASE_URL environment variable is not set`
+
+**Solution:**
+1. Ensure `.env` file exists in the root directory
+2. Verify `DATABASE_URL` is defined in `.env`
+3. Check file permissions (must be readable)
+4. Restart the application after changes
+
+### SSL Connection Errors
+
+**Error:** `SSL connection required`
+
+**Solution:**
+1. Add `?sslmode=require` to your connection string
+2. Or configure your PostgreSQL instance to accept SSL
+3. For local development, you may need to adjust `ssl: 'require'` in `src/db/index.ts`
+
+### Spotify Integration Not Working
+
+**Error:** Spotify commands fail or return authentication errors
+
+**Solution:**
+1. Verify all three Spotify variables are set: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI`
+2. Ensure redirect URI matches your Spotify app dashboard configuration
+3. Check that port 8888 is accessible
+4. Verify credentials are correct (no extra spaces or quotes)

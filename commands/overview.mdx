@@ -1,0 +1,114 @@
+---
+title: Commands Overview
+description: Complete reference of all available WhatsApp Assistant Bot commands
+---
+
+The WhatsApp Assistant Bot responds to commands sent directly through WhatsApp chat. All commands start with `!` or `/` and are designed to help you manage tasks, reminders, notes, and more.
+
+## Quick Reference
+
+| Command | Description | Example |
+|---------|-------------|----------|
+| `!notify` | Set time-based reminders | `!notify call mom 30m` |
+| `!todo` | Manage your todo list | `!todo add Buy groceries` |
+| `!note` | Save and search notes | `!note save Meeting notes` |
+| `!sticker` | Convert images/videos to stickers | `!sticker` (reply to image) |
+| `!timer` | Set countdown timers | `!timer start 30m` |
+| `/play` `/pause` `/skip` | Control Spotify playback | `/play` |
+| `!help` | Show command help | `!help notify` |
+
+## Getting Started
+
+<Steps>
+  <Step title="Send a command">
+    Start a chat with the bot and send any command prefixed with `!`
+    ```
+    !help
+    ```
+  </Step>
+  
+  <Step title="View command details">
+    Get detailed help for any specific command
+    ```
+    !help todo
+    ```
+  </Step>
+  
+  <Step title="Execute commands">
+    Use commands to manage your tasks, notes, and reminders
+    ```
+    !todo add Finish documentation
+    ```
+  </Step>
+</Steps>
+
+## Command Categories
+
+### Productivity
+- **[!notify](/commands/notify)** - Set reminders for future tasks
+- **[!todo](/commands/todo)** - Track and manage your tasks
+- **[!note](/commands/note)** - Save important information
+- **[!timer](/commands/timer)** - Set countdown timers
+
+### Media
+- **[!sticker](/commands/sticker)** - Create custom WhatsApp stickers
+
+### Entertainment
+- **[Spotify Controls](/commands/spotify)** - Control music playback
+
+## Common Patterns
+
+### Time Format
+Many commands accept time durations in the following formats:
+- `30m` - 30 minutes
+- `1h` - 1 hour
+- `2h30m` - 2 hours and 30 minutes
+- `30` - Plain numbers default to minutes
+
+### List Operations
+Commands that manage lists (`todo`, `note`, `timer`) follow consistent patterns:
+- `add/save` - Create new items
+- `list` - View all items
+- `delete` - Remove specific items
+- Use numeric indices to reference items (1, 2, 3...)
+
+## Help System
+
+The bot includes a built-in help system:
+
+```
+!help              # Show all commands
+!help notify       # Show detailed help for a command
+```
+
+## Error Handling
+
+All commands include error handling and will provide helpful feedback:
+
+- Invalid syntax shows usage examples
+- Missing parameters prompt for required information
+- Failed operations display clear error messages with the ❌ prefix
+- Successful operations show confirmation with ✅ prefix
+
+<Accordion title="What happens if I make a typo?">
+  The bot will respond with the correct usage format for that command. For example:
+  
+  ```
+  You: !notify
+  Bot: Usage: !notify <task> <time>
+  ```
+</Accordion>
+
+<Accordion title="Can I see examples for each command?">
+  Yes! Use `!help <command>` to see specific examples:
+  
+  ```
+  !help notify
+  ```
+  
+  This will show the description, usage format, and multiple examples.
+</Accordion>
+
+<Accordion title="Are commands case-sensitive?">
+  No. Subcommands are converted to lowercase internally, so `!todo ADD`, `!todo add`, and `!todo Add` all work the same way.
+</Accordion>

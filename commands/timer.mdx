@@ -1,0 +1,392 @@
+---
+title: Timer Command
+description: Set and manage countdown timers with WhatsApp notifications
+---
+
+The `!timer` command creates countdown timers that notify you when time's up. Perfect for cooking, workouts, study sessions, and any activity where you need a countdown.
+
+## Subcommands
+
+```
+!timer <start|list|cancel> [duration/number]
+```
+
+## Start a Timer
+
+Create a new countdown timer.
+
+```
+!timer start <duration>
+```
+
+### Duration Formats
+
+| Format | Description | Example |
+|--------|-------------|----------|
+| `30m` | Minutes only | 30 minutes |
+| `1h` | Hours only | 60 minutes |
+| `2h30m` | Hours + minutes | 150 minutes |
+| `30` | Plain number | 30 minutes (default) |
+
+<Note>
+  From TimerHandler.ts:5-8, plain numbers are automatically interpreted as minutes:
+  ```typescript
+  if (/^\d+$/.test(timeStr)) {
+      return parseInt(timeStr);
+  }
+  ```
+</Note>
+
+### Examples
+
+**30-minute timer:**
+```
+!timer start 30m
+```
+
+**Response:**
+```
+⏰ Timer set for 30 minutes!
+```
+
+**Short format:**
+```
+!timer start 30
+```
+
+**Response:**
+```
+⏰ Timer set for 30 minutes!
+```
+
+**1-hour timer:**
+```
+!timer start 1h
+```
+
+**Response:**
+```
+⏰ Timer set for 60 minutes!
+```
+
+**Complex duration:**
+```
+!timer start 2h30m
+```
+
+**Response:**
+```
+⏰ Timer set for 150 minutes!
+```
+
+<Warning>
+  Maximum timer duration is 24 hours (1440 minutes). From TimerHandler.ts:65-70:
+  ```typescript
+  if (duration > 1440) {
+      await socket.sendMessage(chat, {
+          text: 'Timer duration cannot exceed 24 hours.'
+      });
+  }
+  ```
+</Warning>
+
+## List Active Timers
+
+View all your running timers with remaining time.
+
+```
+!timer list
+```
+
+**Response:**
+```
+⏰ Active Timers:
+1. ⏳ 25 minutes remaining
+2. ⏳ 45 minutes remaining
+```
+
+### No Active Timers
+
+```
+!timer list
+```
+
+**Response:**
+```
+No active timers.
+```
+
+<Note>
+  Remaining time is calculated dynamically from the stored end time (TimerHandler.ts:86-88):
+  ```typescript
+  const remainingTime = Math.max(0,
+      Math.floor((timer.endTime.getTime() - Date.now()) / 60000)
+  );
+  ```
+</Note>
+
+## Cancel a Timer
+
+Stop and remove an active timer.
+
+```
+!timer cancel <number>
+```
+
+**Example:**
+```
+!timer cancel 1
+```
+
+**Response:**
+```
+⏰ Timer cancelled successfully!
+```
+
+<ParamField path="number" type="integer" required>
+  The timer number from the `!timer list` output
+</ParamField>
+
+## Complete Workflow
+
+<Steps>
+  <Step title="Start a timer">
+    Set a timer for your activity
+    ```
+    !timer start 25m
+    ```
+    Response: `⏰ Timer set for 25 minutes!`
+  </Step>
+  
+  <Step title="Check your timers">
+    View all active timers
+    ```
+    !timer list
+    ```
+    Response:
+    ```
+    ⏰ Active Timers:
+    1. ⏳ 23 minutes remaining
+    ```
+  </Step>
+  
+  <Step title="Get notified">
+    When the timer expires, you receive a WhatsApp notification
+  </Step>
+  
+  <Step title="Cancel if needed">
+    Cancel a timer early if plans change
+    ```
+    !timer cancel 1
+    ```
+  </Step>
+</Steps>
+
+## Common Use Cases
+
+### Pomodoro Technique
+
+```
+!timer start 25m    # Work session
+# ... work ...
+!timer start 5m     # Short break
+```
+
+### Cooking
+
+```
+!timer start 45m    # Bake the chicken
+!timer start 20m    # Boil pasta
+!timer start 10m    # Preheat oven
+```
+
+### Workout Intervals
+
+```
+!timer start 30     # 30 seconds high intensity
+!timer start 10     # 10 seconds rest
+```
+
+### Study Sessions
+
+```
+!timer start 1h30m  # Deep work block
+```
+
+## Parameters
+
+<ParamField path="start" type="subcommand">
+  Create a new timer.
+  
+  **Required:** Duration (minutes, hours, or combination)
+  
+  **Example:** `!timer start 30m`
+</ParamField>
+
+<ParamField path="list" type="subcommand">
+  Display all active timers with remaining time.
+  
+  **Arguments:** None
+  
+  **Example:** `!timer list`
+</ParamField>
+
+<ParamField path="cancel" type="subcommand">
+  Stop and delete a timer.
+  
+  **Required:** Timer number (from list)
+  
+  **Example:** `!timer cancel 1`
+</ParamField>
+
+## Error Handling
+
+### No Subcommand
+
+```
+!timer
+```
+
+**Response:**
+```
+Usage: !timer start <duration> | !timer list | !timer cancel <number>
+```
+
+### Missing Duration
+
+```
+!timer start
+```
+
+**Response:**
+```
+Please specify a duration (e.g., 30m, 1h, or just 30 for minutes).
+```
+
+### Invalid Duration Format
+
+```
+!timer start tomorrow
+```
+
+**Response:**
+```
+Invalid duration format. Examples: 30m, 1h, or just 30 for minutes.
+```
+
+### Exceeds Maximum
+
+```
+!timer start 48h
+```
+
+**Response:**
+```
+Timer duration cannot exceed 24 hours.
+```
+
+### Invalid Timer Number
+
+```
+!timer cancel 99
+```
+
+**Response:**
+```
+Invalid timer number.
+```
+
+### Unknown Subcommand
+
+```
+!timer pause
+```
+
+**Response:**
+```
+Unknown command. Use: start, list, or cancel.
+```
+
+## Implementation Details
+
+### Time Parsing
+
+From TimerHandler.ts:4-24, the parser handles multiple formats:
+
+```typescript
+function parseTimeString(timeStr: string): number | null {
+    // If it's just a number, treat as minutes
+    if (/^\d+$/.test(timeStr)) {
+        return parseInt(timeStr);
+    }
+
+    // Parse time notation (e.g., '30m', '1h')
+    const hourMatch = timeStr.match(/(\d+)h/);
+    const minuteMatch = timeStr.match(/(\d+)m/);
+
+    let totalMinutes = 0;
+
+    if (hourMatch) {
+        totalMinutes += parseInt(hourMatch[1]) * 60;
+    }
+    if (minuteMatch) {
+        totalMinutes += parseInt(minuteMatch[1]);
+    }
+
+    return totalMinutes > 0 ? totalMinutes : null;
+}
+```
+
+### Timer Storage
+
+Timers are stored in the database with:
+- User ID (sender)
+- End time (calculated as current time + duration)
+- ID for reference
+
+From TimerHandler.ts:72:
+```typescript
+await TimerService.create(sender, duration);
+```
+
+### Remaining Time Calculation
+
+The list command calculates remaining minutes dynamically (TimerHandler.ts:85-90):
+
+```typescript
+const timerList = timers.map((timer, index) => {
+    const remainingTime = Math.max(0,
+        Math.floor((timer.endTime.getTime() - Date.now()) / 60000)
+    );
+    return `${index + 1}. ⏳ ${remainingTime} minutes remaining`;
+}).join('\n');
+```
+
+<Accordion title="Can I run multiple timers at once?">
+  Yes! You can have multiple timers running simultaneously. Each timer operates independently, and you can view them all with `!timer list`.
+</Accordion>
+
+<Accordion title="What happens when a timer expires?">
+  The TimerService sends you a WhatsApp notification when the timer reaches zero. The timer is then automatically removed from your active timers list.
+</Accordion>
+
+<Accordion title="Can I pause a timer?">
+  The current implementation doesn't support pausing. You can cancel and restart if needed:
+  ```
+  !timer cancel 1
+  !timer start 15m
+  ```
+</Accordion>
+
+<Accordion title="Are timers private?">
+  Yes, timers are associated with your user ID (sender), so they're private to you. Other users can't see or modify your timers.
+</Accordion>
+
+<Accordion title="Do timers survive if the bot restarts?">
+  This depends on the TimerService implementation. If timers are stored in a persistent database, they should survive restarts. Check the service implementation for details.
+</Accordion>
+
+## Related Commands
+
+- [!notify](/commands/notify) - For reminders at specific times rather than countdowns
+- [!todo](/commands/todo) - Track tasks that timers might be associated with

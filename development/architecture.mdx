@@ -1,0 +1,291 @@
+---
+title: System Architecture
+description: Understanding the WhatsApp Assistant Bot architecture, folder structure, and key components
+---
+
+## Overview
+
+The WhatsApp Assistant Bot is built with TypeScript and follows a modular architecture with clear separation of concerns. The system uses the [Baileys](https://github.com/WhiskeySockets/Baileys) library for WhatsApp integration and PostgreSQL with Drizzle ORM for data persistence.
+
+## Technology Stack
+
+- **Runtime**: Node.js with TypeScript
+- **WhatsApp Integration**: Baileys v7.0.0
+- **Database**: PostgreSQL with Drizzle ORM
+- **Scheduling**: node-cron for reminders and timers
+- **Web Server**: Express (for Spotify OAuth callbacks)
+- **Authentication**: Multi-file auth state (Baileys)
+
+## Project Structure
+
+```
+src/
+├── db/                    # Database layer
+│   ├── index.ts          # Database connection
+│   └── schema.ts         # Drizzle ORM schemas
+├── handlers/             # Message and command handling
+│   ├── commands/         # Individual command handlers
+│   │   ├── index.ts      # Command registry
+│   │   ├── TodoHandler.ts
+│   │   ├── NoteHandler.ts
+│   │   ├── NotifyHandler.ts
+│   │   ├── TimerHandler.ts
+│   │   ├── StickerHandler.ts
+│   │   ├── SpotifyHandler.ts
+│   │   └── HelpHandler.ts
+│   └── messageHandler.ts # Main message router
+├── services/             # Business logic layer
+│   ├── TodoService.ts
+│   ├── NoteService.ts
+│   ├── ReminderService.ts
+│   ├── TimerService.ts
+│   ├── NotificationService.ts
+│   ├── UserService.ts
+│   ├── SpotifyService.ts
+│   ├── InstagramService.ts
+│   └── index.ts         # Service exports
+├── types/               # TypeScript type definitions
+│   └── commands.ts      # Command handler interfaces
+├── utils/               # Utility functions
+│   └── timeParser.ts    # Time parsing utilities
+└── index.ts            # Application entry point
+```
+
+## Core Components
+
+### 1. Baileys Integration
+
+The bot connects to WhatsApp using the Baileys library, which implements the WhatsApp Web API:
+
+```typescript
+// src/index.ts
+const sock = makeWASocket({
+    version,
+    logger,
+    auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
+    printQRInTerminal: false,
+    getMessage,
+});
+```
+
+**Key Features:**
+- QR code authentication
+- Multi-file auth state persistence
+- Event-driven message processing
+- Automatic reconnection on disconnect
+
+### 2. Message Handler
+
+The message handler (`src/handlers/messageHandler.ts`) is the main router for incoming messages:
+
+```typescript
+export async function handleMessage(
+    sock: WASocket,
+    message: proto.IWebMessageInfo
+): Promise<void>
+```
+
+**Responsibilities:**
+- Extract text from various message types (text, image captions, etc.)
+- Detect and handle Instagram/Spotify links
+- Parse command prefix (`!` or `/`)
+- Route commands to appropriate handlers
+- Update user activity
+
+### 3. Command Handler Pattern
+
+All commands implement the `CommandHandler` interface from `src/types/commands.ts`:
+
+```typescript
+export interface CommandHandler {
+    name: string;
+    description: string;
+    usage: string;
+    examples: string[];
+    execute: (context: CommandContext) => Promise<void>;
+}
+
+export interface CommandContext {
+    socket: WASocket;        // WhatsApp socket instance
+    message: proto.IWebMessageInfo; // Original message
+    chat: string;           // Chat ID (group or DM)
+    sender: string;         // User ID who sent the message
+    args: string[];         // Command arguments
+    commandName?: string;   // The command name used
+}
+```
+
+Commands are registered in `src/handlers/commands/index.ts`:
+
+```typescript
+export const commandHandlers: Map<string, CommandHandler> = new Map([
+    ['notify', NotifyHandler],
+    ['todo', TodoHandler],
+    ['note', NoteHandler],
+    ['timer', TimerHandler],
+    ['help', HelpHandler],
+    ['sticker', StickerHandler],
+    ['spotify', SpotifyHandler],
+    ['play', SpotifyHandler],
+    ['pause', SpotifyHandler],
+    ['skip', SpotifyHandler],
+    ['next', SpotifyHandler]
+]);
+```
+
+### 4. Service Layer
+
+Services contain the business logic and database operations. Each service is a static class that provides methods for CRUD operations:
+
+- **TodoService**: Manage todo items
+- **NoteService**: Save and search notes
+- **ReminderService**: Create and manage reminders
+- **TimerService**: Countdown timers with notifications
+- **NotificationService**: Schedule and send notifications
+- **UserService**: User management and settings
+- **SpotifyService**: Spotify API integration
+- **InstagramService**: Instagram content downloading
+
+See the [Services](/development/services) page for detailed documentation.
+
+### 5. Database Layer
+
+The bot uses PostgreSQL with Drizzle ORM. Database schemas are defined in `src/db/schema.ts`:
+
+**Tables:**
+- `users` - User profiles and settings
+- `todos` - Todo list items
+- `reminders` - Scheduled reminders
+- `notes` - User notes
+- `timers` - Active countdown timers
+
+**Schema Example:**
+
+```typescript
+export const todos = pgTable('todos', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull(),
+    chatId: text('chat_id').notNull(),
+    task: text('task').notNull(),
+    completed: boolean('completed').default(false),
+    completedAt: timestamp('completed_at'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+```
+
+### 6. Notification System
+
+`NotificationService` manages scheduled notifications using `node-cron`:
+
+```typescript
+static initialize(socket: WASocket) {
+    NotificationService.waSocket = socket;
+    NotificationService.loadActiveNotifications();
+}
+```
+
+**Features:**
+- Load active reminders and timers on startup
+- Schedule cron jobs for future notifications
+- Send WhatsApp messages at scheduled times
+- Clean up completed notifications
+
+## Application Flow
+
+<Steps>
+
+### Connection Initialization
+
+1. Database connection established
+2. Baileys socket created with auth state
+3. QR code displayed for authentication
+4. Services initialized on successful connection
+
+### Message Processing
+
+1. Message received from WhatsApp
+2. `messageHandler` extracts text content
+3. Check for special patterns (Instagram links, Spotify auth)
+4. Parse command prefix and arguments
+5. Look up command handler in registry
+6. Execute command with context
+7. Send response to user
+
+### Command Execution
+
+1. Command handler validates arguments
+2. Service layer processes business logic
+3. Database operations performed if needed
+4. Response formatted and sent via socket
+5. Error handling and user feedback
+
+</Steps>
+
+## Key Design Patterns
+
+### Command Pattern
+
+Each command is self-contained with its own handler implementing a common interface. This allows:
+- Easy addition of new commands
+- Consistent command structure
+- Centralized command registration
+- Type-safe command contexts
+
+### Service Layer Pattern
+
+Business logic is separated from command handlers:
+- Services handle data operations
+- Handlers focus on user interaction
+- Services can be reused across commands
+- Clear separation of concerns
+
+### Event-Driven Architecture
+
+Baileys uses event processing for all WhatsApp events:
+
+```typescript
+sock.ev.process(async (events) => {
+    if (events['connection.update']) { /* ... */ }
+    if (events['creds.update']) { /* ... */ }
+    if (events['messages.upsert']) { /* ... */ }
+});
+```
+
+## Configuration
+
+The bot requires these environment variables:
+
+- `DATABASE_URL` - PostgreSQL connection string
+- `SPOTIFY_CLIENT_ID` - Spotify API credentials
+- `SPOTIFY_CLIENT_SECRET` - Spotify API credentials
+- `PORT` - Express server port (default: 3000)
+
+## Error Handling
+
+Errors are handled at multiple levels:
+
+1. **Command Level**: Try-catch in each handler's execute method
+2. **Service Level**: Service methods throw errors to handlers
+3. **Database Level**: Drizzle ORM handles query errors
+4. **Connection Level**: Automatic reconnection with exponential backoff
+
+```typescript
+try {
+    // Command logic
+} catch (error) {
+    console.error('Error in command:', error);
+    await socket.sendMessage(chat, {
+        text: '❌ Failed to process command. Please try again.'
+    });
+}
+```
+
+## Next Steps
+
+- Learn how to [add new commands](/development/adding-commands)
+- Explore the [service layer](/development/services)
+- Review the [command reference](/commands/overview) for all available commands

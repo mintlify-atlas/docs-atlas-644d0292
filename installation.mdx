@@ -1,0 +1,532 @@
+---
+title: Installation
+description: Complete installation guide for the WhatsApp Assistant Bot with prerequisites, dependencies, environment setup, and build steps
+---
+
+# Installation
+
+This guide walks you through the complete installation process for the WhatsApp Assistant Bot, from system prerequisites to running the bot for the first time.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+<CardGroup cols={2}>
+  <Card title="Node.js 18+" icon="node-js">
+    Download from [nodejs.org](https://nodejs.org/) or use a version manager like nvm
+  </Card>
+  <Card title="PostgreSQL" icon="database">
+    Install from [postgresql.org](https://www.postgresql.org/download/) or use a managed service
+  </Card>
+</CardGroup>
+
+<Note>
+You'll also need a PostgreSQL database with a connection URL. This can be:
+- A local PostgreSQL installation
+- A managed database service (AWS RDS, Supabase, Railway, etc.)
+</Note>
+
+### Verify Node.js version
+
+Check that you have Node.js 18 or higher:
+
+```bash
+node --version
+```
+
+Expected output:
+```bash
+v18.17.0  # or higher
+```
+
+### Set up PostgreSQL
+
+You need a PostgreSQL database with SSL enabled. Here are a few options:
+
+<Tabs>
+  <Tab title="Local PostgreSQL">
+    Install PostgreSQL locally and create a database:
+
+    ```bash
+    # macOS (Homebrew)
+    brew install postgresql@15
+    brew services start postgresql@15
+
+    # Ubuntu/Debian
+    sudo apt-get install postgresql postgresql-contrib
+    sudo systemctl start postgresql
+
+    # Create database
+    createdb whatsapp_bot
+    ```
+
+    <Warning>
+    Local PostgreSQL typically doesn't use SSL by default. For production, use a managed database service with SSL enabled.
+    </Warning>
+  </Tab>
+
+  <Tab title="Supabase (recommended)">
+    1. Create a free account at [supabase.com](https://supabase.com)
+    2. Create a new project
+    3. Go to **Settings** → **Database**
+    4. Copy the **Connection String** (URI format)
+    5. Use this as your `DATABASE_URL`
+
+    Example format:
+    ```
+    postgres://postgres:[YOUR-PASSWORD]@db.xxxxxxxxxxxxx.supabase.co:5432/postgres
+    ```
+  </Tab>
+
+  <Tab title="Railway">
+    1. Sign up at [railway.app](https://railway.app)
+    2. Create a new project
+    3. Add a PostgreSQL database
+    4. Copy the **DATABASE_URL** from the Variables tab
+
+    Railway provides automatic SSL configuration.
+  </Tab>
+</Tabs>
+
+## Clone the repository
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/yourusername/whatsapp-assistant-bot.git
+    cd whatsapp-assistant-bot
+    ```
+  </Step>
+
+  <Step title="Verify project structure">
+    Your directory should contain:
+
+    ```
+    whatsapp-assistant-bot/
+    ├── src/
+    │   ├── index.ts           # Main entry point
+    │   ├── handlers/          # Command handlers
+    │   ├── services/          # Business logic services
+    │   └── db/                # Database schema and config
+    ├── package.json
+    ├── tsconfig.json
+    └── .env.example           # Example environment variables
+    ```
+  </Step>
+</Steps>
+
+## Install dependencies
+
+Install all required packages:
+
+```bash
+npm install
+```
+
+This installs the following key dependencies:
+
+<AccordionGroup>
+  <Accordion title="Core dependencies">
+    - **baileys** (^7.0.0-rc.9) - WhatsApp Web API library
+    - **postgres** (^3.4.7) - PostgreSQL client
+    - **drizzle-orm** (^0.45.1) - TypeScript ORM for PostgreSQL
+    - **express** (^5.2.1) - Web server for OAuth callbacks
+    - **dotenv** (^17.2.3) - Environment variable management
+  </Accordion>
+
+  <Accordion title="Utilities">
+    - **sharp** (^0.34.5) - Image processing for stickers
+    - **wa-sticker-formatter** (^4.4.4) - WhatsApp sticker creation
+    - **node-cron** (^4.2.1) - Scheduled task execution for reminders
+    - **moment** (^2.30.1) - Date/time parsing and formatting
+    - **pino** (^9.6.0) - Logging library
+    - **qrcode-terminal** (^0.12.0) - QR code display in terminal
+  </Accordion>
+
+  <Accordion title="Development dependencies">
+    - **typescript** (^5.7.2) - TypeScript compiler
+    - **tsx** (^4.19.2) - TypeScript execution for development
+    - **drizzle-kit** (^0.31.8) - Database migration tools
+    - **@types/node**, **@types/express** - TypeScript type definitions
+  </Accordion>
+</AccordionGroup>
+
+## Environment configuration
+
+<Steps>
+  <Step title="Create .env file">
+    Copy the example environment file:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    If `.env.example` doesn't exist, create a new `.env` file:
+
+    ```bash
+    touch .env
+    ```
+  </Step>
+
+  <Step title="Configure environment variables">
+    Open `.env` in your editor and add the following:
+
+    ```bash .env
+    # PostgreSQL connection string
+    DATABASE_URL=postgres://user:password@host:port/database
+
+    # Server ports
+    PORT=3000
+    SPOTIFY_PORT=8888
+
+    # Optional: Spotify OAuth credentials (for music control)
+    SPOTIFY_CLIENT_ID=your_client_id_here
+    SPOTIFY_CLIENT_SECRET=your_client_secret_here
+    ```
+
+    <Warning>
+    Replace the `DATABASE_URL` with your actual PostgreSQL connection string. Ensure it includes `?sslmode=require` for secure connections.
+    </Warning>
+  </Step>
+
+  <Step title="Environment variable reference">
+    | Variable | Required | Description | Example |
+    |----------|----------|-------------|----------|
+    | `DATABASE_URL` | Yes | PostgreSQL connection string with SSL | `postgres://user:pass@host:5432/db` |
+    | `PORT` | No | Main Express server port | `3000` (default) |
+    | `SPOTIFY_PORT` | No | Spotify OAuth callback port | `8888` (default) |
+    | `SPOTIFY_CLIENT_ID` | No | Spotify OAuth client ID | From Spotify Developer Dashboard |
+    | `SPOTIFY_CLIENT_SECRET` | No | Spotify OAuth client secret | From Spotify Developer Dashboard |
+
+    <Tip>
+    Spotify credentials are optional. The bot works without them, but you won't be able to use music control features.
+    </Tip>
+  </Step>
+</Steps>
+
+## Database setup
+
+The bot uses Drizzle ORM with PostgreSQL. The schema is defined in `src/db/schema.ts`:
+
+```typescript src/db/schema.ts
+import { pgTable, text, boolean, timestamp, integer, uuid } from 'drizzle-orm/pg-core';
+
+// Users table
+export const users = pgTable('users', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull().unique(),
+    lastActive: timestamp('last_active').defaultNow(),
+    notificationsEnabled: boolean('notifications_enabled').default(true),
+    timezone: text('timezone').default('UTC'),
+    spotifyRefreshToken: text('spotify_refresh_token'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Todos, reminders, notes, and timers tables...
+```
+
+<Steps>
+  <Step title="Generate database migrations">
+    Create migration files from your schema:
+
+    ```bash
+    npx drizzle-kit generate:pg
+    ```
+
+    This creates SQL migration files in the `drizzle/` folder.
+  </Step>
+
+  <Step title="Run migrations">
+    Apply migrations to your database:
+
+    ```bash
+    npx drizzle-kit push:pg
+    ```
+
+    This creates all necessary tables:
+    - `users` - User profiles and settings
+    - `todos` - Task list items
+    - `reminders` - Scheduled notifications
+    - `notes` - Saved text snippets
+    - `timers` - Active countdown timers
+  </Step>
+
+  <Step title="Verify database connection">
+    The bot tests the database connection on startup:
+
+    ```typescript src/db/index.ts
+    export const connectDatabase = async () => {
+        try {
+            await client`SELECT 1`;
+            console.log('Connected to PostgreSQL successfully');
+        } catch (error) {
+            console.error('PostgreSQL connection error:', error);
+            process.exit(1);
+        }
+    };
+    ```
+
+    If the connection fails, the bot will exit with an error message.
+  </Step>
+</Steps>
+
+## Build the project
+
+Compile TypeScript to JavaScript:
+
+```bash
+npm run build
+```
+
+This runs the TypeScript compiler (`tsc`) and creates compiled files in the `dist/` folder:
+
+```
+dist/
+├── index.js
+├── handlers/
+├── services/
+└── db/
+```
+
+<Note>
+The `dist/` folder is created automatically and should not be committed to version control (it's in `.gitignore`).
+</Note>
+
+## Run the bot
+
+You can run the bot in development or production mode:
+
+<CodeGroup>
+```bash Development mode (with auto-reload)
+npm run dev
+```
+
+```bash Production mode
+npm start
+```
+</CodeGroup>
+
+### Development mode
+
+Uses `tsx watch` to automatically restart on file changes:
+
+```json package.json
+{
+  "scripts": {
+    "dev": "tsx watch src/index.ts"
+  }
+}
+```
+
+Perfect for:
+- Testing changes
+- Debugging
+- Adding new features
+
+### Production mode
+
+Runs the compiled JavaScript from `dist/`:
+
+```json package.json
+{
+  "scripts": {
+    "start": "node dist/index.js"
+  }
+}
+```
+
+Use this for:
+- Deployment to servers
+- Running with process managers (PM2, systemd)
+- Production environments
+
+## First run
+
+When you start the bot for the first time, you'll see:
+
+```bash
+🤖 WhatsApp Reminder Bot Starting...
+
+🌍 Main server listening on port 3000
+🎵 Spotify Callback server listening on port 8888
+Connected to PostgreSQL successfully
+📱 Using WhatsApp Web v2.2431.6, isLatest: true
+
+📱 Scan this QR code with WhatsApp to connect:
+
+█▀▀▀▀▀█ ▀▀█▄ █▀▀ █▀▀▀▀▀█
+█ ███ █ ▄▀██▀ ▀█ █ ███ █
+█ ▀▀▀ █ ██▄█▄▀▄█ █ ▀▀▀ █
+```
+
+<Steps>
+  <Step title="Scan the QR code">
+    1. Open WhatsApp on your phone
+    2. Go to **Settings** → **Linked Devices**
+    3. Tap **Link a Device**
+    4. Scan the QR code in your terminal
+  </Step>
+
+  <Step title="Wait for confirmation">
+    After scanning, you'll see:
+
+    ```bash
+    ✅ Connected to WhatsApp successfully!
+    📝 Bot is now listening for messages...
+
+    Available commands:
+      !help - List all commands
+      !sticker - Convert image/gif to sticker
+      !notify <time> <message> - Set a reminder
+      !todo add <task> - Add a todo
+      !note save <title> <content> - Save a note
+    ```
+  </Step>
+
+  <Step title="Authentication persists">
+    Authentication credentials are saved in the `auth_info/` folder:
+
+    ```
+    auth_info/
+    ├── creds.json
+    └── keys/
+    ```
+
+    <Warning>
+    **Never share or commit the `auth_info/` folder!** It contains your WhatsApp session credentials. Add it to `.gitignore`.
+    </Warning>
+
+    On subsequent runs, the bot will automatically reconnect without requiring a new QR code scan.
+  </Step>
+</Steps>
+
+## Verify installation
+
+Run through this checklist to ensure everything works:
+
+<AccordionGroup>
+  <Accordion title="✅ Database connection successful">
+    Check the logs for:
+    ```
+    Connected to PostgreSQL successfully
+    ```
+
+    If you see an error:
+    - Verify `DATABASE_URL` in `.env`
+    - Ensure PostgreSQL is running
+    - Check SSL configuration
+  </Accordion>
+
+  <Accordion title="✅ WhatsApp connection established">
+    After scanning QR code, look for:
+    ```
+    ✅ Connected to WhatsApp successfully!
+    ```
+
+    If connection fails:
+    - Delete `auth_info/` and try again
+    - Check for WhatsApp Web version compatibility
+    - Ensure no other sessions are blocking
+  </Accordion>
+
+  <Accordion title="✅ Commands work in DMs">
+    Send `!help` to yourself in WhatsApp. You should receive a list of commands.
+
+    If no response:
+    - Verify you're messaging yourself (DM), not a group
+    - Check terminal logs for errors
+    - Ensure the bot process is running
+  </Accordion>
+
+  <Accordion title="✅ Data persistence works">
+    Test data persistence:
+    1. Add a todo: `!todo add Test item`
+    2. Stop the bot (Ctrl+C)
+    3. Restart: `npm run dev`
+    4. List todos: `!todo list`
+
+    You should see your todo. If not, check database connection.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Module not found errors">
+    ```bash
+    Error: Cannot find module 'baileys'
+    ```
+
+    **Solution**: Reinstall dependencies
+    ```bash
+    rm -rf node_modules package-lock.json
+    npm install
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection errors">
+    ```bash
+    PostgreSQL connection error: getaddrinfo ENOTFOUND
+    ```
+
+    **Solutions**:
+    - Verify `DATABASE_URL` format: `postgres://user:pass@host:port/db`
+    - Ensure PostgreSQL server is accessible
+    - Check firewall rules
+    - For managed databases, verify SSL is enabled
+  </Accordion>
+
+  <Accordion title="TypeScript compilation errors">
+    ```bash
+    error TS2307: Cannot find module 'baileys'
+    ```
+
+    **Solution**: Install type definitions
+    ```bash
+    npm install --save-dev @types/node
+    ```
+  </Accordion>
+
+  <Accordion title="QR code not displaying">
+    If the QR code doesn't appear:
+    - Check that `printQRInTerminal` is set correctly in `src/index.ts`
+    - Ensure your terminal supports Unicode characters
+    - Try a different terminal emulator
+  </Accordion>
+
+  <Accordion title="Port already in use">
+    ```bash
+    Error: listen EADDRINUSE: address already in use :::3000
+    ```
+
+    **Solutions**:
+    - Change `PORT` in `.env` to a different value
+    - Kill the process using port 3000:
+      ```bash
+      # macOS/Linux
+      lsof -ti:3000 | xargs kill -9
+
+      # Windows
+      netstat -ano | findstr :3000
+      taskkill /PID <PID> /F
+      ```
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart guide" icon="rocket" href="/quickstart">
+    Send your first commands and test all features
+  </Card>
+  <Card title="Command reference" icon="book">
+    Learn all available commands and their usage
+  </Card>
+  <Card title="Deployment" icon="server">
+    Deploy to a VPS or cloud provider for 24/7 uptime
+  </Card>
+  <Card title="Customization" icon="code">
+    Add custom commands and modify bot behavior
+  </Card>
+</CardGroup>

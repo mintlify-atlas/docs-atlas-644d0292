@@ -1,0 +1,591 @@
+---
+title: Service Layer
+description: Documentation for the service layer including TodoService, NoteService, ReminderService, and more
+---
+
+## Overview
+
+The service layer contains all business logic and database operations for the WhatsApp Assistant Bot. Services are implemented as static classes that provide methods for CRUD operations and domain-specific functionality.
+
+All services use Drizzle ORM for database operations and follow consistent patterns for error handling and data validation.
+
+## Service Architecture
+
+### Design Principles
+
+- **Static Methods**: Services use static methods (no instantiation required)
+- **Database Abstraction**: All database queries go through Drizzle ORM
+- **Type Safety**: Full TypeScript type inference from database schema
+- **Single Responsibility**: Each service handles one domain
+
+### Database Connection
+
+Services import the database instance from `src/db/index.ts`:
+
+```typescript
+import { db, todos, Todo } from '../db/index.js';
+import { eq, and, desc } from 'drizzle-orm';
+```
+
+## TodoService
+
+Manages todo list items with support for completion tracking and bulk operations.
+
+**Location**: `src/services/TodoService.ts`
+
+### Methods
+
+#### `create(userId: string, chatId: string, task: string): Promise<Todo>`
+
+Creates a new todo item.
+
+```typescript
+const todo = await TodoService.create(
+    'user@s.whatsapp.net',
+    'chat@g.us',
+    'Buy groceries'
+);
+```
+
+#### `list(chatId: string, includeCompleted = false): Promise<Todo[]>`
+
+Lists todos for a specific chat. By default, only shows incomplete todos.
+
+```typescript
+// Get only incomplete todos
+const activeTodos = await TodoService.list('chat@g.us');
+
+// Get all todos including completed
+const allTodos = await TodoService.list('chat@g.us', true);
+```
+
+#### `listAllUserTodos(userId: string, includeCompleted = false): Promise<Todo[]>`
+
+Lists all todos for a user across all chats.
+
+```typescript
+const userTodos = await TodoService.listAllUserTodos('user@s.whatsapp.net');
+```
+
+#### `complete(chatId: string, todoId: string): Promise<void>`
+
+Marks a todo as complete and sets the completion timestamp.
+
+```typescript
+await TodoService.complete('chat@g.us', 'uuid-here');
+```
+
+#### `delete(chatId: string, todoId: string): Promise<void>`
+
+Permanently deletes a todo item.
+
+```typescript
+await TodoService.delete('chat@g.us', 'uuid-here');
+```
+
+#### `clearCompleted(chatId: string): Promise<number>`
+
+Deletes all completed todos in a chat and returns the count.
+
+```typescript
+const deletedCount = await TodoService.clearCompleted('chat@g.us');
+// Returns: 5 (number of todos deleted)
+```
+
+#### `getById(chatId: string, todoId: string): Promise<Todo | null>`
+
+Retrieves a specific todo by ID.
+
+```typescript
+const todo = await TodoService.getById('chat@g.us', 'uuid-here');
+if (todo) {
+    console.log(todo.task);
+}
+```
+
+### Todo Type
+
+```typescript
+interface Todo {
+    id: string;
+    userId: string;
+    chatId: string;
+    task: string;
+    completed: boolean;
+    completedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+```
+
+## NoteService
+
+Handles note creation, retrieval, and search functionality.
+
+**Location**: `src/services/NoteService.ts`
+
+### Methods
+
+#### `create(userId: string, content: string): Promise<Note>`
+
+Creates a new note for a user.
+
+```typescript
+const note = await NoteService.create(
+    'user@s.whatsapp.net',
+    'Remember to call mom on Sunday'
+);
+```
+
+#### `list(userId: string): Promise<Note[]>`
+
+Returns all notes for a user, sorted by most recently updated.
+
+```typescript
+const notes = await NoteService.list('user@s.whatsapp.net');
+```
+
+#### `getById(userId: string, noteId: string): Promise<Note | null>`
+
+Retrieves a specific note by ID.
+
+```typescript
+const note = await NoteService.getById('user@s.whatsapp.net', 'uuid-here');
+```
+
+#### `update(userId: string, noteId: string, content: string): Promise<Note | null>`
+
+Updates the content of an existing note.
+
+```typescript
+const updated = await NoteService.update(
+    'user@s.whatsapp.net',
+    'uuid-here',
+    'Updated note content'
+);
+```
+
+#### `delete(userId: string, noteId: string): Promise<boolean>`
+
+Deletes a note and returns true if successful.
+
+```typescript
+const deleted = await NoteService.delete('user@s.whatsapp.net', 'uuid-here');
+```
+
+#### `search(userId: string, query: string): Promise<Note[]>`
+
+Searches notes using case-insensitive pattern matching (PostgreSQL ILIKE).
+
+```typescript
+const results = await NoteService.search('user@s.whatsapp.net', 'grocery');
+// Returns up to 10 matching notes
+```
+
+### Note Type
+
+```typescript
+interface Note {
+    id: string;
+    userId: string;
+    content: string;
+    tags: string[];
+    createdAt: Date;
+    updatedAt: Date;
+}
+```
+
+## ReminderService
+
+Manages scheduled reminders with notification integration.
+
+**Location**: `src/services/ReminderService.ts`
+
+### Methods
+
+#### `create(userId: string, task: string, time: Date, notifyUsers: string[] = []): Promise<Reminder>`
+
+Creates a reminder and schedules it for notification.
+
+```typescript
+const reminderTime = new Date(Date.now() + 30 * 60000); // 30 minutes from now
+
+const reminder = await ReminderService.create(
+    'user@s.whatsapp.net',
+    'Call client about project',
+    reminderTime,
+    ['friend@s.whatsapp.net'] // Optional: additional users to notify
+);
+```
+
+**Note**: This automatically schedules the notification via `NotificationService`.
+
+#### `list(userId: string, includeCompleted = false): Promise<Reminder[]>`
+
+Lists reminders for a user, sorted by time.
+
+```typescript
+const upcomingReminders = await ReminderService.list('user@s.whatsapp.net');
+```
+
+#### `delete(userId: string, reminderId: string): Promise<void>`
+
+Deletes a reminder and cancels its scheduled notification.
+
+```typescript
+await ReminderService.delete('user@s.whatsapp.net', 'uuid-here');
+```
+
+#### `clearCompleted(userId: string): Promise<number>`
+
+Removes all completed reminders for a user.
+
+```typescript
+const clearedCount = await ReminderService.clearCompleted('user@s.whatsapp.net');
+```
+
+### Reminder Type
+
+```typescript
+interface Reminder {
+    id: string;
+    userId: string;
+    task: string;
+    time: Date;
+    notifyUsers: string[];
+    isCompleted: boolean;
+    createdAt: Date;
+}
+```
+
+## TimerService
+
+Manages countdown timers with cron-based scheduling.
+
+**Location**: `src/services/TimerService.ts`
+
+### Lifecycle Methods
+
+#### `initialize(socket: WASocket): void`
+
+Initializes the service and loads active timers from the database.
+
+```typescript
+// Called in src/index.ts when connection is established
+TimerService.initialize(sock);
+```
+
+#### `cleanup(): void`
+
+Stops all active timers and clears resources.
+
+```typescript
+// Called when connection is closed
+TimerService.cleanup();
+```
+
+### Timer Methods
+
+#### `create(userId: string, duration: number): Promise<Timer>`
+
+Creates and schedules a timer (duration in minutes).
+
+```typescript
+const timer = await TimerService.create(
+    'user@s.whatsapp.net',
+    25 // 25 minutes (Pomodoro timer)
+);
+```
+
+#### `list(userId: string): Promise<Timer[]>`
+
+Lists all active timers for a user.
+
+```typescript
+const activeTimers = await TimerService.list('user@s.whatsapp.net');
+```
+
+#### `cancel(userId: string, timerId: string): Promise<void>`
+
+Cancels a timer and stops its notification.
+
+```typescript
+await TimerService.cancel('user@s.whatsapp.net', 'uuid-here');
+```
+
+### Implementation Details
+
+- Uses `node-cron` for scheduling timer completions
+- Maintains in-memory map of active cron jobs
+- Automatically loads timers on startup
+- Sends WhatsApp notification when timer completes
+
+### Timer Type
+
+```typescript
+interface Timer {
+    id: string;
+    userId: string;
+    duration: number; // in minutes
+    endTime: Date;
+    isActive: boolean;
+    createdAt: Date;
+}
+```
+
+## NotificationService
+
+Central service for scheduling and sending notifications.
+
+**Location**: `src/services/NotificationService.ts`
+
+### Lifecycle Methods
+
+#### `initialize(socket: WASocket): void`
+
+Initializes the service and loads all active notifications.
+
+```typescript
+NotificationService.initialize(sock);
+```
+
+#### `cleanup(): void`
+
+Stops all scheduled jobs and clears resources.
+
+```typescript
+NotificationService.cleanup();
+```
+
+### Scheduling Methods
+
+#### `scheduleReminder(reminder: Reminder): Promise<void>`
+
+Schedules a reminder notification using cron.
+
+```typescript
+await NotificationService.scheduleReminder(reminder);
+```
+
+#### `scheduleTimer(timer: Timer): Promise<void>`
+
+Schedules a timer completion notification.
+
+```typescript
+await NotificationService.scheduleTimer(timer);
+```
+
+#### `cancelReminder(reminderId: string): void`
+
+Cancels a scheduled reminder notification.
+
+```typescript
+NotificationService.cancelReminder('uuid-here');
+```
+
+#### `cancelTimer(timerId: string): void`
+
+Cancels a scheduled timer notification.
+
+```typescript
+NotificationService.cancelTimer('uuid-here');
+```
+
+### Implementation Details
+
+- Uses cron expressions to schedule exact notification times
+- Maintains separate maps for reminder and timer jobs
+- Automatically marks reminders/timers as completed after sending
+- Handles multiple recipients for reminders
+
+## UserService
+
+Manages user accounts and settings.
+
+**Location**: `src/services/UserService.ts`
+
+### Methods
+
+#### `getOrCreate(userId: string): Promise<User>`
+
+Retrieves a user or creates one if it doesn't exist.
+
+```typescript
+const user = await UserService.getOrCreate('user@s.whatsapp.net');
+```
+
+#### `updateLastActive(userId: string): Promise<void>`
+
+Updates the user's last active timestamp.
+
+```typescript
+await UserService.updateLastActive('user@s.whatsapp.net');
+```
+
+**Note**: This is called automatically by the message handler for every command.
+
+#### `updateSettings(userId: string, settings: Partial<UserSettings>): Promise<void>`
+
+Updates user settings.
+
+```typescript
+await UserService.updateSettings('user@s.whatsapp.net', {
+    notificationsEnabled: false,
+    timezone: 'America/New_York'
+});
+```
+
+#### `getSettings(userId: string): Promise<UserSettings>`
+
+Retrieves user settings (creates user if doesn't exist).
+
+```typescript
+const settings = await UserService.getSettings('user@s.whatsapp.net');
+console.log(settings.timezone); // 'UTC'
+```
+
+#### `exists(userId: string): Promise<boolean>`
+
+Checks if a user exists in the database.
+
+```typescript
+const userExists = await UserService.exists('user@s.whatsapp.net');
+```
+
+### User Types
+
+```typescript
+interface User {
+    id: string;
+    userId: string;
+    lastActive: Date;
+    notificationsEnabled: boolean;
+    timezone: string;
+    spotifyRefreshToken: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+interface UserSettings {
+    notificationsEnabled: boolean;
+    timezone: string;
+}
+```
+
+## Creating a New Service
+
+<Steps>
+
+### Step 1: Define the Database Schema
+
+Add your table to `src/db/schema.ts`:
+
+```typescript
+export const myTable = pgTable('my_table', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id').notNull(),
+    data: text('data').notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+export type MyData = typeof myTable.$inferSelect;
+export type NewMyData = typeof myTable.$inferInsert;
+```
+
+### Step 2: Create the Service File
+
+Create `src/services/MyService.ts`:
+
+```typescript
+import { db, myTable, MyData } from '../db/index.js';
+import { eq } from 'drizzle-orm';
+
+export class MyService {
+    static async create(userId: string, data: string): Promise<MyData> {
+        const [result] = await db.insert(myTable)
+            .values({ userId, data })
+            .returning();
+        return result;
+    }
+
+    static async list(userId: string): Promise<MyData[]> {
+        return await db.select()
+            .from(myTable)
+            .where(eq(myTable.userId, userId));
+    }
+
+    // Add more methods as needed
+}
+```
+
+### Step 3: Export from Index
+
+Add to `src/services/index.ts`:
+
+```typescript
+export { MyService } from './MyService.js';
+```
+
+### Step 4: Use in Command Handlers
+
+```typescript
+import { MyService } from '../../services/MyService.js';
+
+// In your command handler
+const data = await MyService.create(sender, 'some data');
+```
+
+</Steps>
+
+## Best Practices
+
+### 1. Always Use Returning
+
+When inserting or updating, use `.returning()` to get the result:
+
+```typescript
+const [newItem] = await db.insert(table).values(data).returning();
+return newItem;
+```
+
+### 2. Use Drizzle Query Builders
+
+```typescript
+// Good: Type-safe queries
+await db.select()
+    .from(todos)
+    .where(and(
+        eq(todos.userId, userId),
+        eq(todos.completed, false)
+    ));
+
+// Bad: Raw SQL
+await db.execute(sql`SELECT * FROM todos WHERE user_id = ${userId}`);
+```
+
+### 3. Handle Null Results
+
+```typescript
+static async getById(id: string): Promise<Item | null> {
+    const result = await db.select()
+        .from(items)
+        .where(eq(items.id, id))
+        .limit(1);
+    return result[0] || null; // Handle empty array
+}
+```
+
+### 4. Use Transactions for Related Operations
+
+```typescript
+await db.transaction(async (tx) => {
+    await tx.insert(table1).values(data1);
+    await tx.insert(table2).values(data2);
+});
+```
+
+## Next Steps
+
+- Learn how to [add new commands](/development/adding-commands) that use services
+- Review the [System Architecture](/development/architecture) for overall design
+- Check the [Drizzle ORM documentation](https://orm.drizzle.team/) for advanced queries
